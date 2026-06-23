@@ -2,7 +2,6 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/rpillz/laravel-visitor.svg?style=flat-square)](https://packagist.org/packages/rpillz/laravel-visitor)
 [![GitHub Tests Action Status](https://github.com/rpillz/laravel-visitor/actions/workflows/run-tests.yml/badge.svg)](https://github.com/rpillz/laravel-visitor/actions?query=workflow%3Arun-tests+branch%3Amain)
-[![GitHub Code Style Action Status](https://github.com/rpillz/laravel-visitor/actions/workflows/fix-php-code-style-issues.yml/badge.svg)](https://github.com/rpillz/laravel-visitor/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/rpillz/laravel-visitor.svg?style=flat-square)](https://packagist.org/packages/rpillz/laravel-visitor)
 
 Minimalist page-visit analytics for Laravel. Records visits to an isolated SQLite database, resolves country and device info in the background, and surfaces reports through a Filament admin panel plugin — with zero impact on page load times.
