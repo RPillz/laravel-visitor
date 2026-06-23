@@ -8,7 +8,7 @@ class AgentResolver
 {
     public function isBot(string $userAgent): bool
     {
-        $agent = new Agent();
+        $agent = new Agent;
         $agent->setUserAgent($userAgent);
 
         return $agent->isRobot();
@@ -16,7 +16,7 @@ class AgentResolver
 
     public function resolve(string $userAgent): array
     {
-        $agent = new Agent();
+        $agent = new Agent;
         $agent->setUserAgent($userAgent);
 
         return [

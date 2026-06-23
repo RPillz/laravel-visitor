@@ -45,14 +45,14 @@ class LaravelVisitorServiceProvider extends PackageServiceProvider
 
         if ($driver === 'libsql') {
             $libsqlConfig = [
-                'driver'          => 'libsql',
-                'database'        => config('visitor.db.database') ?: null,
-                'url'             => config('visitor.db.url'),
-                'authToken'       => config('visitor.db.auth_token'),
-                'syncInterval'    => (int) config('visitor.db.sync_interval', 5),
+                'driver' => 'libsql',
+                'database' => config('visitor.db.database') ?: null,
+                'url' => config('visitor.db.url'),
+                'authToken' => config('visitor.db.auth_token'),
+                'syncInterval' => (int) config('visitor.db.sync_interval', 5),
                 'read_your_writes' => (bool) config('visitor.db.read_your_writes', true),
-                'encryptionKey'   => config('visitor.db.encryption_key'),
-                'prefix'          => '',
+                'encryptionKey' => config('visitor.db.encryption_key'),
+                'prefix' => '',
             ];
 
             config(['database.connections.'.$connectionName => $libsqlConfig]);
@@ -67,9 +67,9 @@ class LaravelVisitorServiceProvider extends PackageServiceProvider
         }
 
         config(['database.connections.'.$connectionName => [
-            'driver'                  => 'sqlite',
-            'database'                => config('visitor.db.database') ?: storage_path('app/visitor.sqlite'),
-            'prefix'                  => '',
+            'driver' => 'sqlite',
+            'database' => config('visitor.db.database') ?: storage_path('app/visitor.sqlite'),
+            'prefix' => '',
             'foreign_key_constraints' => true,
         ]]);
     }

@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Queue;
 use RPillz\LaravelVisitor\Jobs\TrackVisitJob;
+use RPillz\LaravelVisitor\LaravelVisitor;
 use RPillz\LaravelVisitor\Models\Visit;
 use RPillz\LaravelVisitor\Support\GeoResolver;
 
@@ -18,7 +19,7 @@ it('does not pass an ip address to the job when store_ip is false', function () 
 
     $request = Request::create('https://example.com/about', 'GET');
 
-    app(\RPillz\LaravelVisitor\LaravelVisitor::class)->track($request);
+    app(LaravelVisitor::class)->track($request);
 
     Queue::assertPushed(TrackVisitJob::class, function (TrackVisitJob $job) {
         return $job->ipAddress === null;

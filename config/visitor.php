@@ -40,13 +40,13 @@ return [
     |     VISITOR_DB_DATABASE=/absolute/path/to/local/replica.sqlite
     */
     'db' => [
-        'driver'          => env('VISITOR_DB_DRIVER', 'sqlite'),
-        'url'             => env('VISITOR_DB_URL', null),
-        'auth_token'      => env('VISITOR_DB_AUTH_TOKEN', null),
-        'database'        => env('VISITOR_DB_DATABASE', null),  // SQLite path or libSQL embedded replica path
-        'sync_interval'   => env('VISITOR_DB_SYNC_INTERVAL', 5),
+        'driver' => env('VISITOR_DB_DRIVER', 'sqlite'),
+        'url' => env('VISITOR_DB_URL', null),
+        'auth_token' => env('VISITOR_DB_AUTH_TOKEN', null),
+        'database' => env('VISITOR_DB_DATABASE', null),  // SQLite path or libSQL embedded replica path
+        'sync_interval' => env('VISITOR_DB_SYNC_INTERVAL', 5),
         'read_your_writes' => env('VISITOR_DB_READ_YOUR_WRITES', true),
-        'encryption_key'  => env('VISITOR_DB_ENCRYPTION_KEY', null),
+        'encryption_key' => env('VISITOR_DB_ENCRYPTION_KEY', null),
     ],
 
     /*
@@ -147,7 +147,7 @@ return [
     */
     'deduplication' => [
         'enabled' => env('VISITOR_DEDUP_ENABLED', true),
-        'window'  => env('VISITOR_DEDUP_WINDOW', 30), // minutes
+        'window' => env('VISITOR_DEDUP_WINDOW', 30), // minutes
     ],
 
     /*

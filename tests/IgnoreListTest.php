@@ -5,8 +5,10 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use RPillz\LaravelVisitor\Http\Middleware\TrackVisit;
 use RPillz\LaravelVisitor\Jobs\TrackVisitJob;
+use RPillz\LaravelVisitor\LaravelVisitor;
 use RPillz\LaravelVisitor\Models\Visit;
 use RPillz\LaravelVisitor\Models\VisitorIgnore;
+use Symfony\Component\HttpFoundation\Response;
 
 beforeEach(function () {
     config([
@@ -21,9 +23,9 @@ beforeEach(function () {
     Queue::fake();
 });
 
-function makeOkResponse(): \Symfony\Component\HttpFoundation\Response
+function makeOkResponse(): Response
 {
-    return new \Symfony\Component\HttpFoundation\Response('OK', 200);
+    return new Response('OK', 200);
 }
 
 // --- Middleware: IP ignore ---
@@ -88,7 +90,7 @@ it('deletes existing visits by user_id when a user_id ignore entry is created', 
 // --- Cache invalidation ---
 
 it('flushes the ignore list cache when an entry is created', function () {
-    $key = 'visitor.ignore_list.'.\RPillz\LaravelVisitor\LaravelVisitor::resolveConnection();
+    $key = 'visitor.ignore_list.'.LaravelVisitor::resolveConnection();
     Cache::put($key, ['ip' => ['old.ip']], now()->addMinutes(5));
 
     VisitorIgnore::create(['type' => 'ip', 'value' => '1.2.3.4']);
@@ -97,7 +99,7 @@ it('flushes the ignore list cache when an entry is created', function () {
 });
 
 it('flushes the ignore list cache when an entry is deleted', function () {
-    $key = 'visitor.ignore_list.'.\RPillz\LaravelVisitor\LaravelVisitor::resolveConnection();
+    $key = 'visitor.ignore_list.'.LaravelVisitor::resolveConnection();
     $ignore = VisitorIgnore::create(['type' => 'ip', 'value' => '1.2.3.4']);
     Cache::put($key, ['ip' => ['1.2.3.4']], now()->addMinutes(5));
 
@@ -107,7 +109,7 @@ it('flushes the ignore list cache when an entry is deleted', function () {
 });
 
 it('flushes the ignore list cache when an entry is updated', function () {
-    $key = 'visitor.ignore_list.'.\RPillz\LaravelVisitor\LaravelVisitor::resolveConnection();
+    $key = 'visitor.ignore_list.'.LaravelVisitor::resolveConnection();
     $ignore = VisitorIgnore::create(['type' => 'ip', 'value' => '1.2.3.4']);
     Cache::put($key, ['ip' => ['1.2.3.4']], now()->addMinutes(5));
 
