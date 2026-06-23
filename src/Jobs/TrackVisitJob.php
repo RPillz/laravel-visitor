@@ -1,0 +1,65 @@
+<?php
+
+namespace RPillz\LaravelVisitor\Jobs;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use RPillz\LaravelVisitor\Models\Visit;
+use RPillz\LaravelVisitor\Support\AgentResolver;
+use RPillz\LaravelVisitor\Support\GeoResolver;
+
+class TrackVisitJob implements ShouldQueue
+{
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
+
+    public function __construct(
+        public readonly string $dbConnection,
+        public readonly string $url,
+        public readonly string $path,
+        public readonly ?string $query,
+        public readonly ?string $referrer,
+        public readonly ?string $ipAddress,
+        public readonly ?string $userAgent,
+        public readonly ?string $sessionId,
+        public readonly ?int $userId,
+    ) {}
+
+    public function handle(GeoResolver $geoResolver, AgentResolver $agentResolver): void
+    {
+        $geo = $this->ipAddress
+            ? $geoResolver->resolve($this->ipAddress)
+            : ['country' => null, 'city' => null];
+
+        $agent = $this->userAgent
+            ? $agentResolver->resolve($this->userAgent)
+            : ['device_type' => null, 'browser' => null, 'os' => null, 'is_robot' => false];
+
+        $referrerDomain = null;
+        if ($this->referrer) {
+            $parsed = parse_url($this->referrer);
+            $referrerDomain = $parsed['host'] ?? null;
+        }
+
+        Visit::on($this->dbConnection)->create([
+            'url' => $this->url,
+            'path' => $this->path,
+            'query' => $this->query,
+            'referrer' => $this->referrer,
+            'referrer_domain' => $referrerDomain,
+            'ip_address' => $this->ipAddress,
+            'country' => $geo['country'],
+            'city' => $geo['city'],
+            'device_type' => $agent['device_type'],
+            'browser' => $agent['browser'],
+            'os' => $agent['os'],
+            'user_id' => $this->userId,
+            'session_id' => $this->sessionId,
+        ]);
+    }
+}
