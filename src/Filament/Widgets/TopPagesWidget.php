@@ -16,7 +16,7 @@ class TopPagesWidget extends TableWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    public function getTableRecordKey(Model | array $record): string
+    public function getTableRecordKey(Model|array $record): string
     {
         return is_array($record) ? $record['path'] : $record->path;
     }

@@ -3,7 +3,6 @@
 namespace RPillz\LaravelVisitor\Filament\Widgets;
 
 use Filament\Widgets\ChartWidget;
-use Illuminate\Support\Facades\DB;
 use RPillz\LaravelVisitor\Models\Visit;
 
 class VisitsChartWidget extends ChartWidget

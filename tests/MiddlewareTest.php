@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Queue;
-use RPillz\LaravelVisitor\Jobs\TrackVisitJob;
 use RPillz\LaravelVisitor\Http\Middleware\TrackVisit;
+use RPillz\LaravelVisitor\Jobs\TrackVisitJob;
 use Symfony\Component\HttpFoundation\Response;
 
 beforeEach(function () {
@@ -19,7 +19,7 @@ beforeEach(function () {
 
 function makeResponse(int $status = 200): Response
 {
-    return new \Symfony\Component\HttpFoundation\Response('OK', $status);
+    return new Response('OK', $status);
 }
 
 it('tracks a normal GET request', function () {

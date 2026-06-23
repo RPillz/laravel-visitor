@@ -16,7 +16,7 @@ class DevicesWidget extends TableWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    public function getTableRecordKey(Model | array $record): string
+    public function getTableRecordKey(Model|array $record): string
     {
         if (is_array($record)) {
             return implode('|', [$record['device_type'], $record['browser'], $record['os']]);

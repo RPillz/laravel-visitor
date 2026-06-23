@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 use SanderMuller\BoostCore\Config\BoostConfig;
 use SanderMuller\BoostCore\Enums\Agent;
@@ -31,24 +33,23 @@ return BoostConfig::configure()->withTags([
         'sandermuller/package-boost-php',
         'spatie/laravel-ray',
         'stolt/lean-package-validator',
-    ])
+    ]);
 
-    // Optionally disable specific FileEmitter implementations by FQCN.
-    // ->withDisabledEmitters([SomeFqcn::class])
+// Optionally disable specific FileEmitter implementations by FQCN.
+// ->withDisabledEmitters([SomeFqcn::class])
 
-    // Skill tags: a vendor skill ships only when every tag in its
-    // `metadata.boost-tags` is declared here. Unset = receive every
-    // (untagged) skill. Accepts Tag enum cases or raw strings.
-    // ->withTags([Tag::Php, Tag::Laravel])
+// Skill tags: a vendor skill ships only when every tag in its
+// `metadata.boost-tags` is declared here. Unset = receive every
+// (untagged) skill. Accepts Tag enum cases or raw strings.
+// ->withTags([Tag::Php, Tag::Laravel])
 
-    // Exclude specific vendor skills regardless of tags.
-    // Each entry is a `vendor/package:skill-name` string.
-    // ->withExcludedSkills(['acme/some-pack:unwanted-skill'])
+// Exclude specific vendor skills regardless of tags.
+// Each entry is a `vendor/package:skill-name` string.
+// ->withExcludedSkills(['acme/some-pack:unwanted-skill'])
 
-    // Source paths default to the project root's .ai/skills and
-    // .ai/guidelines. Override with an ABSOLUTE path only if your
-    // sources live elsewhere. Avoid __DIR__-relative paths — they
-    // break if this file moves (e.g. into .config/).
-    // ->withSkillsPath('/absolute/path/to/skills')
-    // ->withGuidelinesPath('/absolute/path/to/guidelines')
-;
+// Source paths default to the project root's .ai/skills and
+// .ai/guidelines. Override with an ABSOLUTE path only if your
+// sources live elsewhere. Avoid __DIR__-relative paths — they
+// break if this file moves (e.g. into .config/).
+// ->withSkillsPath('/absolute/path/to/skills')
+// ->withGuidelinesPath('/absolute/path/to/guidelines')
