@@ -13,8 +13,8 @@ Minimalist page-visit analytics for Laravel. Records visits to an isolated SQLit
 - **Separate database connection** (SQLite by default) keeps analytics data out of your main DB
 - Resolves **country & city** from a local MaxMind GeoLite2 database (no external API calls)
 - Detects **device type, browser, and OS** from the User-Agent string
-- Optionally stores the **authenticated user ID**
-- Supports **anonymous mode** globally or per-call
+- **Anonymous by default** — no user IDs or IPs stored without opt-in
+- User ID tracking opt-in, overridable per-call via `Visitor::anonymous()`
 - **Bot filtering** out of the box
 - **Database-driven ignore list** — block IPs and user IDs from tracking via Filament UI; existing visits are deleted automatically when an entry is added
 - **Filament v5 plugin** with an analytics dashboard: stats overview, visits chart, top pages, referrers, device breakdown, and ignore list management
@@ -151,16 +151,16 @@ Visitor::track($request);
 
 ### Anonymous tracking
 
-Force a specific call to skip storing the user ID, regardless of the global config:
+By default (`anonymous = true`), no user IDs are ever stored. If you've enabled user ID storage globally (`anonymous = false`), you can force a specific call to skip it:
 
 ```php
 Visitor::anonymous()->track($request);
 ```
 
-Or disable user ID tracking globally in `config/visitor.php`:
+To enable user ID storage globally, set this in `config/visitor.php`:
 
 ```php
-'anonymous' => true,
+'anonymous' => false,
 ```
 
 ### Multi-tenant support
@@ -337,7 +337,7 @@ Each visit record stores:
 
 ## GDPR Considerations
 
-By default this package stores IP addresses and user IDs, which are personal data under GDPR. Depending on your jurisdiction and use case you may need user consent before tracking, or you may want to avoid storing personal data altogether.
+By default this package does not track personal data, but does have the option to store IP addresses, Geolocation, and user IDs, which are personal data under GDPR. Depending on your jurisdiction and use case you may need user consent before tracking, or you may want to avoid storing personal data altogether.
 
 ### Default behaviour (consent-free)
 
