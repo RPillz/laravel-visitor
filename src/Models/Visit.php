@@ -2,6 +2,7 @@
 
 namespace RPillz\LaravelVisitor\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use RPillz\LaravelVisitor\Database\Factories\VisitFactory;
@@ -26,7 +27,9 @@ class Visit extends Model
         'browser',
         'os',
         'user_agent',
+        'header_fingerprint',
         'bot_name',
+        'is_blocked',
         'is_user',
         'user_id',
         'session_id',
@@ -34,9 +37,15 @@ class Visit extends Model
 
     protected $casts = [
         'created_at' => 'datetime',
+        'is_blocked' => 'boolean',
         'is_user' => 'boolean',
         'user_id' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('exclude_blocked', fn (Builder $q) => $q->where('is_blocked', false));
+    }
 
     public function getConnectionName(): string
     {

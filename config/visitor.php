@@ -168,6 +168,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Probe Path Detection
+    |--------------------------------------------------------------------------
+    | When block_probes is true, requests matching any probe_paths pattern are
+    | treated as scraper/scanner activity: the requesting IP is automatically
+    | blocked and receives a 403. Supports wildcards (* and ?).
+    |
+    | probe_block_duration sets how long (in minutes) the automatic block lasts.
+    | Omit or set to null for a permanent block.
+    */
+    'block_probes' => env('VISITOR_BLOCK_PROBES', true),
+
+    'log_blocks' => env('VISITOR_LOG_BLOCKS', false),
+
+    'probe_paths' => [
+        // 'wp-admin*',
+        // 'wp-login*',
+        // '.env*',
+        // 'phpinfo*',
+        // 'xmlrpc.php',
+    ],
+
+    'probe_block_duration' => env('VISITOR_PROBE_BLOCK_DURATION', null), // minutes, null = permanent
+
+    'probe_404' => [
+        'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 10), // 404s within the window before blocking
+        'window' => env('VISITOR_PROBE_404_WINDOW', 5),        // minutes
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Data Pruning
     |--------------------------------------------------------------------------
     | Automatically prune old visit records. Run `php artisan visitor:prune`

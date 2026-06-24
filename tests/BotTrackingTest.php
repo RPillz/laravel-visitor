@@ -102,6 +102,64 @@ it('stores the raw user_agent string on the visit record', function () {
     expect(Visit::first()->user_agent)->toBe($ua);
 });
 
+// --- Unidentified bot detection ---
+
+it('sets bot_name to Unidentified Bot when headers do not look browser-like', function () {
+    TrackVisitJob::dispatchSync(
+        dbConnection: config('visitor.connection', 'visitor'),
+        url: 'https://example.com/about',
+        path: '/about',
+        query: null,
+        referrer: null,
+        ipAddress: null,
+        userAgent: 'custom-scanner/1.0',
+        sessionId: null,
+        isUser: false,
+        userId: null,
+        looksLikeBrowser: false,
+    );
+
+    expect(Visit::first()->bot_name)->toBe('Unidentified Bot');
+});
+
+it('does not flag as unidentified bot when headers look browser-like', function () {
+    TrackVisitJob::dispatchSync(
+        dbConnection: config('visitor.connection', 'visitor'),
+        url: 'https://example.com/about',
+        path: '/about',
+        query: null,
+        referrer: null,
+        ipAddress: null,
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        sessionId: null,
+        isUser: false,
+        userId: null,
+        looksLikeBrowser: true,
+    );
+
+    expect(Visit::first()->bot_name)->toBeNull();
+});
+
+it('does not override a known bot name with Unidentified Bot', function () {
+    TrackVisitJob::dispatchSync(
+        dbConnection: config('visitor.connection', 'visitor'),
+        url: 'https://example.com/about',
+        path: '/about',
+        query: null,
+        referrer: null,
+        ipAddress: null,
+        userAgent: GOOGLEBOT_UA,
+        sessionId: null,
+        isUser: false,
+        userId: null,
+        looksLikeBrowser: false,
+    );
+
+    $visit = Visit::first();
+    expect($visit->bot_name)->not->toBe('Unidentified Bot')
+        ->and($visit->bot_name)->not->toBeNull();
+});
+
 // --- is_user flag ---
 
 it('stores is_user true on the visit record when isUser is true', function () {

@@ -5,10 +5,13 @@ namespace RPillz\LaravelVisitor\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use RPillz\LaravelVisitor\Jobs\TrackVisitJob;
 use RPillz\LaravelVisitor\LaravelVisitor;
 use RPillz\LaravelVisitor\Models\VisitorIgnore;
 use RPillz\LaravelVisitor\Support\AgentResolver;
+use RPillz\LaravelVisitor\Support\HeaderFingerprint;
 use Symfony\Component\HttpFoundation\Response;
 
 class TrackVisit
@@ -16,12 +19,19 @@ class TrackVisit
     public function __construct(
         protected LaravelVisitor $visitor,
         protected AgentResolver $agentResolver,
+        protected HeaderFingerprint $headerFingerprint,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
         if ($this->isBlocked($request)) {
-            return response('Forbidden', 403);
+            return $this->blockResponse($request);
+        }
+
+        if (config('visitor.block_probes', true) && $this->isProbe($request)) {
+            $this->autoBlock($request);
+
+            return $this->blockResponse($request);
         }
 
         return $next($request);
@@ -32,6 +42,8 @@ class TrackVisit
         if ($this->shouldTrack($request, $response)) {
             $this->visitor->track($request);
         }
+
+        $this->maybeBlockFor404s($request, $response);
     }
 
     protected function shouldTrack(Request $request, Response $response): bool
@@ -66,13 +78,115 @@ class TrackVisit
         return true;
     }
 
+    protected function blockResponse(Request $request): Response
+    {
+        if (config('visitor.log_blocks', false)) {
+            $this->trackBlocked($request);
+        }
+
+        return response('Forbidden', 403);
+    }
+
+    protected function trackBlocked(Request $request): void
+    {
+        $connection = LaravelVisitor::resolveConnection();
+        $path = '/'.ltrim($request->path(), '/');
+        $anonymous = config('visitor.anonymous', false);
+
+        TrackVisitJob::dispatch(
+            dbConnection: $connection,
+            url: $request->fullUrl(),
+            path: $path,
+            query: $request->getQueryString(),
+            referrer: $request->header('referer'),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+            sessionId: $request->hasSession() ? $request->session()->getId() : null,
+            isUser: auth()->check(),
+            userId: (! $anonymous && auth()->check()) ? auth()->id() : null,
+            isBlocked: true,
+            headerFingerprint: $this->headerFingerprint->compute($request),
+            looksLikeBrowser: $this->headerFingerprint->looksLikeBrowser($request),
+        )
+            ->onConnection(config('visitor.queue.connection'))
+            ->onQueue(config('visitor.queue.name', 'default'));
+    }
+
+    protected function isProbe(Request $request): bool
+    {
+        $paths = config('visitor.probe_paths', []);
+
+        if (empty($paths)) {
+            return false;
+        }
+
+        foreach ($paths as $pattern) {
+            if (Str::is($pattern, $request->path())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function autoBlock(Request $request): void
+    {
+        $duration = config('visitor.probe_block_duration');
+        $expiresAt = $duration ? now()->addMinutes((int) $duration) : null;
+
+        if ($request->ip()) {
+            VisitorIgnore::updateOrCreate(
+                ['type' => 'ip', 'value' => $request->ip()],
+                ['is_blocked' => true, 'is_automatic' => true, 'expires_at' => $expiresAt],
+            );
+        }
+
+        $fingerprint = $this->headerFingerprint->compute($request);
+        VisitorIgnore::updateOrCreate(
+            ['type' => 'header_fingerprint', 'value' => $fingerprint],
+            ['is_blocked' => true, 'is_automatic' => true, 'expires_at' => $expiresAt],
+        );
+    }
+
+    protected function maybeBlockFor404s(Request $request, Response $response): void
+    {
+        if ($response->getStatusCode() !== 404) {
+            return;
+        }
+
+        if (! $request->ip()) {
+            return;
+        }
+
+        if ($this->isIgnored($request)) {
+            return;
+        }
+
+        $config = config('visitor.probe_404', []);
+
+        if (! config('visitor.block_probes', true)) {
+            return;
+        }
+
+        $threshold = (int) ($config['threshold'] ?? 10);
+        $window = (int) ($config['window'] ?? 5);
+
+        $key = 'visitor_404_'.LaravelVisitor::resolveConnection().'_'.$request->ip();
+
+        RateLimiter::hit($key, $window * 60);
+
+        if (RateLimiter::tooManyAttempts($key, $threshold)) {
+            $this->autoBlock($request);
+        }
+    }
+
     protected function isBlocked(Request $request): bool
     {
         $list = $this->getIgnoreList();
 
         if ($request->ip()) {
             foreach ($list['ip'] ?? [] as $entry) {
-                if ($entry['is_blocked'] && $entry['value'] === $request->ip()) {
+                if ($entry['is_blocked'] && $entry['value'] === $request->ip() && $this->isActive($entry)) {
                     return true;
                 }
             }
@@ -80,7 +194,7 @@ class TrackVisit
 
         if (auth()->check()) {
             foreach ($list['user_id'] ?? [] as $entry) {
-                if ($entry['is_blocked'] && $entry['value'] === (string) auth()->id()) {
+                if ($entry['is_blocked'] && $entry['value'] === (string) auth()->id() && $this->isActive($entry)) {
                     return true;
                 }
             }
@@ -88,9 +202,16 @@ class TrackVisit
 
         if ($request->userAgent()) {
             foreach ($list['user_agent'] ?? [] as $entry) {
-                if ($entry['is_blocked'] && Str::is($entry['value'], $request->userAgent())) {
+                if ($entry['is_blocked'] && Str::is($entry['value'], $request->userAgent()) && $this->isActive($entry)) {
                     return true;
                 }
+            }
+        }
+
+        $fingerprint = $this->headerFingerprint->compute($request);
+        foreach ($list['header_fingerprint'] ?? [] as $entry) {
+            if ($entry['is_blocked'] && $entry['value'] === $fingerprint && $this->isActive($entry)) {
+                return true;
             }
         }
 
@@ -101,17 +222,23 @@ class TrackVisit
     {
         $list = $this->getIgnoreList();
 
-        if ($request->ip() && collect($list['ip'] ?? [])->pluck('value')->contains($request->ip())) {
-            return true;
+        if ($request->ip()) {
+            $active = collect($list['ip'] ?? [])->filter(fn ($e) => $this->isActive($e));
+            if ($active->pluck('value')->contains($request->ip())) {
+                return true;
+            }
         }
 
-        if (auth()->check() && collect($list['user_id'] ?? [])->pluck('value')->contains((string) auth()->id())) {
-            return true;
+        if (auth()->check()) {
+            $active = collect($list['user_id'] ?? [])->filter(fn ($e) => $this->isActive($e));
+            if ($active->pluck('value')->contains((string) auth()->id())) {
+                return true;
+            }
         }
 
         if ($request->userAgent()) {
             foreach ($list['user_agent'] ?? [] as $entry) {
-                if (Str::is($entry['value'], $request->userAgent())) {
+                if ($this->isActive($entry) && Str::is($entry['value'], $request->userAgent())) {
                     return true;
                 }
             }
@@ -120,14 +247,22 @@ class TrackVisit
         return false;
     }
 
+    protected function isActive(array $entry): bool
+    {
+        return ! $entry['expires_at'] || $entry['expires_at']->isFuture();
+    }
+
     protected function getIgnoreList(): array
     {
         return Cache::remember('visitor.ignore_list.'.LaravelVisitor::resolveConnection(), now()->addMinutes(5), function () {
-            return VisitorIgnore::all()
+            return VisitorIgnore::where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })->get()
                 ->groupBy('type')
                 ->map(fn ($items) => $items->map(fn ($item) => [
                     'value' => $item->value,
                     'is_blocked' => (bool) $item->is_blocked,
+                    'expires_at' => $item->expires_at,
                 ])->values()->all())
                 ->all();
         });

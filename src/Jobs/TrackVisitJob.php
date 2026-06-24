@@ -29,6 +29,9 @@ class TrackVisitJob implements ShouldQueue
         public readonly ?string $sessionId,
         public readonly bool $isUser,
         public readonly ?int $userId,
+        public readonly bool $isBlocked = false,
+        public readonly ?string $headerFingerprint = null,
+        public readonly bool $looksLikeBrowser = true,
     ) {}
 
     public function handle(GeoResolver $geoResolver, AgentResolver $agentResolver): void
@@ -39,7 +42,11 @@ class TrackVisitJob implements ShouldQueue
 
         $agent = $this->userAgent
             ? $agentResolver->resolve($this->userAgent)
-            : ['device_type' => null, 'browser' => null, 'os' => null, 'is_robot' => false];
+            : ['device_type' => null, 'browser' => null, 'os' => null, 'is_robot' => false, 'bot_name' => null];
+
+        if (! $this->looksLikeBrowser && ! $agent['bot_name']) {
+            $agent['bot_name'] = 'Unidentified Bot';
+        }
 
         $referrerDomain = null;
         if ($this->referrer) {
@@ -60,7 +67,9 @@ class TrackVisitJob implements ShouldQueue
             'browser' => $agent['browser'],
             'os' => $agent['os'],
             'user_agent' => $this->userAgent,
+            'header_fingerprint' => $this->headerFingerprint,
             'bot_name' => $agent['bot_name'],
+            'is_blocked' => $this->isBlocked,
             'is_user' => $this->isUser,
             'user_id' => $this->userId,
             'session_id' => $this->sessionId,

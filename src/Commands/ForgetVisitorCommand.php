@@ -40,7 +40,7 @@ class ForgetVisitorCommand extends Command
 
     protected function forgetByUserId(string $userId): int
     {
-        $count = Visit::where('user_id', $userId)->count();
+        $count = Visit::withoutGlobalScope('exclude_blocked')->where('user_id', $userId)->count();
 
         if ($count === 0) {
             $this->info("No visit records found for user ID {$userId}.");
@@ -54,7 +54,7 @@ class ForgetVisitorCommand extends Command
             return self::SUCCESS;
         }
 
-        Visit::where('user_id', $userId)->delete();
+        Visit::withoutGlobalScope('exclude_blocked')->where('user_id', $userId)->delete();
         $this->info("Erased {$count} visit record(s) for user ID {$userId}.");
 
         return self::SUCCESS;
@@ -62,7 +62,7 @@ class ForgetVisitorCommand extends Command
 
     protected function forgetBySessionId(string $sessionId): int
     {
-        $count = Visit::where('session_id', $sessionId)->count();
+        $count = Visit::withoutGlobalScope('exclude_blocked')->where('session_id', $sessionId)->count();
 
         if ($count === 0) {
             $this->info("No visit records found for session ID {$sessionId}.");
@@ -76,7 +76,7 @@ class ForgetVisitorCommand extends Command
             return self::SUCCESS;
         }
 
-        Visit::where('session_id', $sessionId)->delete();
+        Visit::withoutGlobalScope('exclude_blocked')->where('session_id', $sessionId)->delete();
         $this->info("Erased {$count} visit record(s) for session ID {$sessionId}.");
 
         return self::SUCCESS;
@@ -84,7 +84,7 @@ class ForgetVisitorCommand extends Command
 
     protected function forgetByIp(string $ip): int
     {
-        $count = Visit::where('ip_address', $ip)->count();
+        $count = Visit::withoutGlobalScope('exclude_blocked')->where('ip_address', $ip)->count();
 
         if ($count === 0) {
             $this->info("No visit records found for IP address {$ip}.");
@@ -98,7 +98,7 @@ class ForgetVisitorCommand extends Command
             return self::SUCCESS;
         }
 
-        Visit::where('ip_address', $ip)->delete();
+        Visit::withoutGlobalScope('exclude_blocked')->where('ip_address', $ip)->delete();
         $this->info("Erased {$count} visit record(s) for IP address {$ip}.");
 
         return self::SUCCESS;

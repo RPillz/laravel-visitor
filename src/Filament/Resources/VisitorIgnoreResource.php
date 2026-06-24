@@ -4,6 +4,7 @@ namespace RPillz\LaravelVisitor\Filament\Resources;
 
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -35,6 +36,7 @@ class VisitorIgnoreResource extends Resource
                     'ip' => 'IP Address',
                     'user_id' => 'User ID',
                     'user_agent' => 'User Agent',
+                    'header_fingerprint' => 'Header Fingerprint',
                 ])
                 ->required(),
             TextInput::make('value')
@@ -44,6 +46,10 @@ class VisitorIgnoreResource extends Resource
             Toggle::make('is_blocked')
                 ->label('Block request (return 403)')
                 ->default(false),
+            DateTimePicker::make('expires_at')
+                ->label('Expires at')
+                ->helperText('Leave blank for a permanent entry.')
+                ->nullable(),
         ]);
     }
 
@@ -57,6 +63,7 @@ class VisitorIgnoreResource extends Resource
                         'ip' => 'warning',
                         'user_id' => 'danger',
                         'user_agent' => 'info',
+                        'header_fingerprint' => 'success',
                         default => 'gray',
                     }),
                 TextColumn::make('value')
@@ -68,6 +75,17 @@ class VisitorIgnoreResource extends Resource
                     ->falseColor('gray')
                     ->trueIcon('heroicon-o-shield-exclamation')
                     ->falseIcon('heroicon-o-eye'),
+                IconColumn::make('is_automatic')
+                    ->boolean()
+                    ->trueColor('warning')
+                    ->falseColor('gray')
+                    ->trueIcon('heroicon-o-cpu-chip')
+                    ->falseIcon('heroicon-o-user')
+                    ->label('Source'),
+                TextColumn::make('expires_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->placeholder('Never'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),

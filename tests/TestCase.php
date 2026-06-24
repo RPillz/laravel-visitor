@@ -40,5 +40,6 @@ class TestCase extends Orchestra
 
         $migration = include __DIR__.'/../database/migrations/create_visitor_ignores_table.php.stub';
         $migration->up();
+
     }
 }

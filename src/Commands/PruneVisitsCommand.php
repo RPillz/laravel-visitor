@@ -4,6 +4,7 @@ namespace RPillz\LaravelVisitor\Commands;
 
 use Illuminate\Console\Command;
 use RPillz\LaravelVisitor\Models\Visit;
+use RPillz\LaravelVisitor\Models\VisitorIgnore;
 
 class PruneVisitsCommand extends Command
 {
@@ -15,9 +16,20 @@ class PruneVisitsCommand extends Command
     {
         $days = (int) ($this->option('days') ?? config('visitor.pruning.days', 365));
 
-        $count = Visit::where('created_at', '<', now()->subDays($days))->delete();
+        $count = Visit::withoutGlobalScope('exclude_blocked')
+            ->where('created_at', '<', now()->subDays($days))
+            ->delete();
 
         $this->info("Pruned {$count} visit records older than {$days} days.");
+
+        $pruned = VisitorIgnore::where('is_automatic', true)
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<', now())
+            ->delete();
+
+        if ($pruned > 0) {
+            $this->info("Pruned {$pruned} expired automatic block(s).");
+        }
 
         return self::SUCCESS;
     }

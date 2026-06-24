@@ -18,6 +18,8 @@ return new class extends Migration
             $table->string('type', 20)->index();
             $table->string('value')->index();
             $table->boolean('is_blocked')->default(false);
+            $table->boolean('is_automatic')->default(false);
+            $table->timestamp('expires_at')->nullable();
             $table->timestamp('created_at')->nullable();
         });
     }

@@ -10,11 +10,13 @@ class VisitorIgnore extends Model
 {
     const UPDATED_AT = null;
 
-    protected $fillable = ['type', 'value', 'is_blocked'];
+    protected $fillable = ['type', 'value', 'is_blocked', 'is_automatic', 'expires_at'];
 
     protected $casts = [
         'created_at' => 'datetime',
         'is_blocked' => 'boolean',
+        'is_automatic' => 'boolean',
+        'expires_at' => 'datetime',
     ];
 
     public function getConnectionName(): string
@@ -31,11 +33,12 @@ class VisitorIgnore extends Model
                 'ip' => 'ip_address',
                 'user_id' => 'user_id',
                 'user_agent' => 'user_agent',
+                'header_fingerprint' => 'header_fingerprint',
                 default => null,
             };
 
             if ($column !== null) {
-                Visit::where($column, $ignore->value)->delete();
+                Visit::withoutGlobalScope('exclude_blocked')->where($column, $ignore->value)->delete();
             }
         });
 

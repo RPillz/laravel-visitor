@@ -3,6 +3,7 @@
 namespace RPillz\LaravelVisitor\Filament\Pages;
 
 use Filament\Pages\Page;
+use RPillz\LaravelVisitor\Filament\Widgets\BlockStatsWidget;
 use RPillz\LaravelVisitor\Filament\Widgets\BotStatsWidget;
 use RPillz\LaravelVisitor\Filament\Widgets\BouncePagesWidget;
 use RPillz\LaravelVisitor\Filament\Widgets\DevicesWidget;
@@ -33,6 +34,7 @@ class VisitorDashboard extends Page
         return [
             OverviewStatsWidget::class,
             BotStatsWidget::class,
+            BlockStatsWidget::class,
             VisitsChartWidget::class,
             TopPagesWidget::class,
             LandingPagesWidget::class,

@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use RPillz\LaravelVisitor\Jobs\TrackVisitJob;
+use RPillz\LaravelVisitor\Support\HeaderFingerprint;
 
 class LaravelVisitor
 {
@@ -59,6 +60,8 @@ class LaravelVisitor
             return;
         }
 
+        $fingerprinter = app(HeaderFingerprint::class);
+
         TrackVisitJob::dispatch(
             dbConnection: $connection,
             url: $request->fullUrl(),
@@ -70,6 +73,8 @@ class LaravelVisitor
             sessionId: $sessionId,
             isUser: auth()->check(),
             userId: (! $anonymous && auth()->check()) ? auth()->id() : null,
+            headerFingerprint: $fingerprinter->compute($request),
+            looksLikeBrowser: $fingerprinter->looksLikeBrowser($request),
         )
             ->onConnection(config('visitor.queue.connection'))
             ->onQueue(config('visitor.queue.name', 'default'));
