@@ -67,7 +67,7 @@ class VisitorIgnoreResource extends Resource
                     ->trueColor('danger')
                     ->falseColor('gray')
                     ->trueIcon('heroicon-o-shield-exclamation')
-                    ->falseIcon('heroicon-o-eye-slash'),
+                    ->falseIcon('heroicon-o-eye'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
