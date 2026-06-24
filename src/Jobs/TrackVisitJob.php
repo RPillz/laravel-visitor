@@ -30,6 +30,7 @@ class TrackVisitJob implements ShouldQueue
         public readonly bool $isUser,
         public readonly ?int $userId,
         public readonly bool $isBlocked = false,
+        public readonly bool $isVerified = false,
         public readonly ?string $headerFingerprint = null,
         public readonly bool $looksLikeBrowser = true,
     ) {}
@@ -70,6 +71,7 @@ class TrackVisitJob implements ShouldQueue
             'header_fingerprint' => $this->headerFingerprint,
             'bot_name' => $agent['bot_name'],
             'is_blocked' => $this->isBlocked,
+            'is_verified' => $this->isVerified,
             'is_user' => $this->isUser,
             'user_id' => $this->userId,
             'session_id' => $this->sessionId,

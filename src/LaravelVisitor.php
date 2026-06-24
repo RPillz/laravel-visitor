@@ -12,6 +12,8 @@ class LaravelVisitor
 {
     protected bool $forceAnonymous = false;
 
+    protected bool $isVerified = false;
+
     protected ?string $pendingConnection = null;
 
     protected static ?Closure $connectionResolver = null;
@@ -38,6 +40,14 @@ class LaravelVisitor
         return $clone;
     }
 
+    public function verified(): static
+    {
+        $clone = clone $this;
+        $clone->isVerified = true;
+
+        return $clone;
+    }
+
     public function setConnection(string $name): static
     {
         $clone = clone $this;
@@ -50,6 +60,8 @@ class LaravelVisitor
     {
         $connection = $this->pendingConnection ?? static::resolveConnection();
         $this->pendingConnection = null;
+        $isVerified = $this->isVerified;
+        $this->isVerified = false;
 
         $anonymous = $this->forceAnonymous || config('visitor.anonymous', false);
 
@@ -73,6 +85,7 @@ class LaravelVisitor
             sessionId: $sessionId,
             isUser: auth()->check(),
             userId: (! $anonymous && auth()->check()) ? auth()->id() : null,
+            isVerified: $isVerified,
             headerFingerprint: $fingerprinter->compute($request),
             looksLikeBrowser: $fingerprinter->looksLikeBrowser($request),
         )

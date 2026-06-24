@@ -16,20 +16,20 @@ beforeEach(function () {
 
 // --- Probe detection ---
 
-it('returns 403 when a probe path is accessed', function () {
+it('returns 404 when a probe path is accessed', function () {
     $request = Request::create('https://example.com/wp-admin', 'GET', [], [], [], ['REMOTE_ADDR' => '1.2.3.4']);
 
     $response = app(TrackVisit::class)->handle($request, fn () => new Response('OK', 200));
 
-    expect($response->getStatusCode())->toBe(403);
+    expect($response->getStatusCode())->toBe(404);
 });
 
-it('returns 403 for probe paths with wildcard suffix', function () {
+it('returns 404 for probe paths with wildcard suffix', function () {
     $request = Request::create('https://example.com/wp-admin/setup-config.php', 'GET', [], [], [], ['REMOTE_ADDR' => '1.2.3.4']);
 
     $response = app(TrackVisit::class)->handle($request, fn () => new Response('OK', 200));
 
-    expect($response->getStatusCode())->toBe(403);
+    expect($response->getStatusCode())->toBe(404);
 });
 
 it('does not block normal paths when probe_paths are configured', function () {

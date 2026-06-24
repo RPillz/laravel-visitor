@@ -2,6 +2,7 @@
 
 namespace RPillz\LaravelVisitor\Filament\Widgets;
 
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -31,7 +32,7 @@ class TopBotsWidget extends TableWidget
         return $table
             ->query(
                 Visit::query()
-                    ->selectRaw('bot_name, COUNT(*) as visit_count')
+                    ->selectRaw('bot_name, COUNT(*) as visit_count, MAX(is_verified) as is_verified')
                     ->whereNotNull('bot_name')
                     ->groupBy('bot_name')
                     ->orderByDesc('visit_count')
@@ -43,6 +44,13 @@ class TopBotsWidget extends TableWidget
                 TextColumn::make('visit_count')
                     ->label('Visits')
                     ->sortable(),
+                IconColumn::make('is_verified')
+                    ->label('Verified')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-badge')
+                    ->falseIcon('heroicon-o-x-mark')
+                    ->trueColor('success')
+                    ->falseColor('gray'),
             ])
             ->filters([
                 SelectFilter::make('period')

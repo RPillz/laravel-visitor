@@ -12,6 +12,8 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use RPillz\LaravelVisitor\Filament\Resources\VisitorIgnoreResource\Pages\ListVisitorIgnores;
 use RPillz\LaravelVisitor\Models\VisitorIgnore;
@@ -22,7 +24,7 @@ class VisitorIgnoreResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-no-symbol';
 
-    protected static ?string $navigationLabel = 'Ignore List';
+    protected static ?string $navigationLabel = 'Ignore / Block List';
 
     protected static \UnitEnum|string|null $navigationGroup = 'Analytics';
 
@@ -70,6 +72,7 @@ class VisitorIgnoreResource extends Resource
                     ->searchable()
                     ->copyable(),
                 IconColumn::make('is_blocked')
+                    ->label('Action')
                     ->boolean()
                     ->trueColor('danger')
                     ->falseColor('gray')
@@ -90,14 +93,26 @@ class VisitorIgnoreResource extends Resource
                     ->dateTime()
                     ->sortable(),
             ])
+            ->filters([
+                TernaryFilter::make('is_blocked')
+                    ->label('Blocked')
+                    ->trueLabel('Blocked only')
+                    ->falseLabel('Ignored only'),
+                SelectFilter::make('is_automatic')
+                    ->label('Source')
+                    ->options([
+                        '0' => 'User',
+                        '1' => 'System',
+                    ]),
+            ])
             ->headerActions([
                 CreateAction::make(),
             ])
             ->actions([
                 DeleteAction::make(),
             ])
-            ->emptyStateHeading('No ignored visitors')
-            ->emptyStateDescription('Add IP addresses, user IDs, or user agents to prevent them from being tracked.');
+            ->emptyStateHeading('No ignore or block rules')
+            ->emptyStateDescription('Add IP addresses, user IDs, or user agents to silently ignore or block visitors.');
     }
 
     public static function getPages(): array

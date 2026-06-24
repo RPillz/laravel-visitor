@@ -6,6 +6,8 @@
 
 Minimalist page-visit analytics for Laravel. Records visits to an isolated SQLite database, resolves country and device info in the background, and surfaces reports through a Filament admin panel plugin — with zero impact on page load times.
 
+Since we're checking all the visits anyway we can also track, and potentially block, bots and crawlers to your site.
+
 ## Features
 
 - All tracking runs on a **queued job** — never blocks a request
@@ -14,9 +16,14 @@ Minimalist page-visit analytics for Laravel. Records visits to an isolated SQLit
 - Detects **device type, browser, and OS** from the User-Agent string
 - **Anonymous by default** — no user IDs or IPs stored without opt-in
 - User ID tracking opt-in, overridable per-call via `Visitor::anonymous()`
-- **Bot filtering** out of the box
-- **Database-driven ignore list** — block IPs and user IDs from tracking via Filament UI; existing visits are deleted automatically when an entry is added
-- **Filament v5 plugin** with an analytics dashboard: stats overview, visits chart, top pages, referrers, device breakdown, and ignore list management
+- **Bot tracking** — records bots with their name and header fingerprint; unidentified non-browser requests labelled automatically
+- **Probe path blocking** — auto-blocks scanners hitting known attack paths (wp-admin, .env, etc.)
+- **404 rate-limit blocking** — auto-blocks IPs that rack up too many 404s in a short window
+- **Header fingerprinting** — tracks and blocks bots that rotate IPs
+- **Verified crawler passthrough** — rDNS-verified search engines (Google, Bing, etc.) bypass auto-blocking
+- **Database-driven ignore/block list** — block by IP, user ID, user agent wildcard, or header fingerprint via Filament UI; soft-ignore or hard-block (403 returned); temporary or permanent
+- **Block logging** — optionally record blocked requests for auditing
+- **Filament v5 plugin** with an analytics dashboard and bot management: stats overview, visits chart, top pages, referrers, device breakdown, bot stats, bot list, and ignore/block list management
 
 ## Requirements
 
@@ -208,6 +215,112 @@ The default retention period is 365 days. Override per-run:
 php artisan visitor:prune --days=90
 ```
 
+## Blocking & Bot Protection
+
+The middleware runs active blocking logic **before** the request reaches your application, so malicious scanners and repeat offenders are rejected at the edge with no application overhead.
+
+### Probe path blocking
+
+Requests hitting known scanner paths (wp-admin, .env, phpinfo, etc.) are automatically blocked and the requesting IP is added to the block list. Blocked requests receive a 404 response so scanners get no information about your stack.
+
+Configure the paths and block duration in `config/visitor.php`:
+
+```php
+'block_probes' => true, // set false to disable entirely
+
+'probe_paths' => [
+    'wp-admin*',
+    'wp-login*',
+    '.env*',
+    'phpinfo*',
+    'xmlrpc.php',
+    // add your own patterns — supports * and ? wildcards
+],
+
+'probe_block_duration' => null, // minutes, null = permanent block
+```
+
+Set `VISITOR_BLOCK_PROBES=false` to disable probe blocking without touching the config file.
+
+### 404 rate-limit blocking
+
+IPs that generate too many 404 responses in a short window are automatically blocked. This catches scanners that don't match any specific probe path but are obviously enumerating your routes.
+
+```php
+'probe_404' => [
+    'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 10), // 404s before blocking
+    'window'    => env('VISITOR_PROBE_404_WINDOW', 5),     // rolling window in minutes
+],
+```
+
+Once the threshold is exceeded, further requests from that IP return 429 until the block expires.
+
+### Header fingerprinting
+
+The middleware computes a lightweight fingerprint from the request's HTTP headers. This fingerprint is stored alongside each visit and is used when auto-blocking — so a scanner that rotates IPs is still caught and blocked by its fingerprint.
+
+Manual blocks via the Filament **Bot List** resource also prefer fingerprint-based blocks over user-agent wildcards when a fingerprint is available.
+
+### Verified crawlers
+
+Legitimate search engine bots verify themselves via reverse DNS. When `verified_crawlers` is enabled, the middleware checks whether the requesting IP reverse-resolves to a hostname that forward-resolves back to the same IP and whose suffix matches a known crawler domain. Verified bots bypass probe-path and 404-rate blocking entirely, and their visits are stored with `is_verified = true`.
+
+```php
+'verified_crawlers' => [
+    'enabled'   => env('VISITOR_VERIFIED_CRAWLERS', true),
+    'cache_ttl' => env('VISITOR_CRAWLER_CACHE_TTL', 1440), // minutes per IP
+    'domains'   => [
+        'googlebot.com',
+        'google.com',
+        'search.msn.com',
+        'duckduckgo.com',
+        'applebot.apple.com',
+        'yandex.com', 'yandex.net', 'yandex.ru',
+        'crawl.baidu.com',
+    ],
+],
+```
+
+DNS results are cached per IP for `cache_ttl` minutes so verification only runs once per unique crawler address.
+
+### Block logging
+
+To record blocked requests for auditing, enable block logging:
+
+```php
+'log_blocks' => env('VISITOR_LOG_BLOCKS', false),
+```
+
+When enabled, blocked requests are dispatched to the queue and stored as visit records with `is_blocked = true`. The `Visit` model's default global scope excludes these from all normal queries, so they never appear in analytics — only in the raw table.
+
+## Ignore List & Block List
+
+The ignore/block list controls what happens to a visitor:
+
+- **Ignore** (tracking skipped) — the visit is silently not recorded; the request proceeds normally
+- **Block** (`is_blocked = true`) — the request is rejected with a 403 before reaching your application
+
+Entries can target:
+
+| Type | Matches |
+|---|---|
+| `ip` | Exact IP address |
+| `user_id` | Authenticated user ID |
+| `user_agent` | User-Agent string (supports `*` and `?` wildcards) |
+| `header_fingerprint` | Computed header fingerprint hash |
+
+Entries can be **permanent** or **temporary** (`expires_at`). Automatic blocks (from probe detection and 404 rate limiting) are flagged `is_automatic = true` and are distinct from manually added entries.
+
+### Managing the list
+
+When the Filament plugin is registered, an **Ignore List** resource appears in the Analytics navigation group. From there you can add, edit, or remove entries.
+
+**When an ignore entry is added**, all existing visit records matching that value are deleted immediately. Future visits are silently skipped.
+
+**When a block entry is added**, the IP, user agent, or fingerprint is rejected at the middleware with a 403 — no application code runs at all.
+
+The list is loaded from the database and cached for 5 minutes (`visitor.ignore_list.<connection>`). The cache is flushed automatically whenever an entry is added or removed.
+
 ## Filament Plugin
 
 Register the plugin in your Filament panel provider:
@@ -225,7 +338,9 @@ public function panel(Panel $panel): Panel
 }
 ```
 
-This adds an **Analytics** page to your panel at `/your-panel/analytics` with five widgets, plus an **Ignore List** resource for managing blocked IPs and user IDs:
+This adds an **Analytics** page to your panel at `/your-panel/analytics` with the following widgets and resources:
+
+### Analytics dashboard widgets
 
 | Widget | Description |
 |---|---|
@@ -234,25 +349,17 @@ This adds an **Analytics** page to your panel at `/your-panel/analytics` with fi
 | Top Pages | Most-visited paths ranked by visit count |
 | Top Referrers | Referring domains ranked by visit count |
 | Devices & Browsers | Breakdown of device type, browser, and OS |
+| Bot Stats | Total bot visits, today's count, and verified crawler count (hidden when `track_bots = false`) |
+| Top Bots | Table of bots ranked by visit count with verified status (hidden when `track_bots = false`) |
 
-## Ignore List
+### Resources
 
-The ignore list lets you permanently block specific IP addresses or authenticated user IDs from being tracked — useful for excluding yourself, your team, or known bots that slip past the user-agent filter.
+| Resource | Description |
+|---|---|
+| Bot List | All tracked bots grouped by name and fingerprint; one-click block action per entry |
+| Ignore List | Full ignore/block list management — add entries by IP, user ID, user agent, or fingerprint |
 
-### Managing ignored visitors
-
-When the Filament plugin is registered, an **Ignore List** resource appears in the Analytics navigation group. From there you can:
-
-- Add an IP address or user ID to the ignore list
-- Remove entries to resume tracking for that visitor
-
-**When an entry is added**, all existing visit records matching that IP or user ID are deleted immediately. Future visits from that IP or user will be silently skipped in the middleware.
-
-### How it works
-
-The ignore list is stored in a `visitor_ignores` table on the same database connection as visit records. The middleware loads and caches the full list for 5 minutes (`visitor.ignore_list`), so there is no per-request database query after the first hit. The cache is flushed automatically whenever an entry is added or removed.
-
-The middleware checks both the **request IP** and the **authenticated user ID** on every tracked request.
+The **Bot List** block action uses the header fingerprint when one is recorded, falling back to a wildcard user-agent rule (`*BotName*`) when not.
 
 ## Configuration
 
@@ -269,22 +376,21 @@ return [
         'name'       => env('VISITOR_QUEUE_NAME', 'default'),
     ],
 
-    // Automatically append visitor.track to the web middleware group (tracks all web routes)
-    // Set to false to apply the middleware selectively to specific route groups instead
+    // Automatically append visitor.track to the web middleware group
     'auto_track' => env('VISITOR_AUTO_TRACK', true),
 
-    // Paths to exclude from automatic middleware tracking (supports * and ? wildcards)
+    // Paths to exclude from tracking (supports * and ? wildcards)
     'exclude_paths' => [
         'admin*', '_debugbar*', 'horizon*', 'telescope*', 'livewire*', '_ignition*',
     ],
 
-    // Skip requests detected as bots or crawlers (check runs in middleware, never hits the queue)
-    'exclude_bots' => true,
+    // Track bot/crawler visits (stores bot_name, fingerprint, is_verified)
+    'track_bots' => env('VISITOR_TRACK_BOTS', true),
 
-    // Skip requests from these IP addresses (useful for your own machine or staging server)
+    // Skip requests from these IPs
     'exclude_ips' => [],
 
-    // Only track requests using these HTTP methods
+    // Only track these HTTP methods
     'track_methods' => ['GET'],
 
     // Never store the authenticated user ID
@@ -303,6 +409,37 @@ return [
     'geoip' => [
         'enabled'  => env('VISITOR_GEOIP_ENABLED', true),
         'database' => env('VISITOR_GEOIP_DATABASE', storage_path('app/geoip/GeoLite2-City.mmdb')),
+    ],
+
+    // Auto-block IPs and fingerprints that hit probe paths; return 404
+    'block_probes' => env('VISITOR_BLOCK_PROBES', true),
+
+    // Record blocked requests as visits with is_blocked=true (excluded from analytics)
+    'log_blocks' => env('VISITOR_LOG_BLOCKS', false),
+
+    // Paths treated as probe/scanner activity (supports wildcards)
+    'probe_paths' => [
+        'wp-admin*', 'wp-login*', '.env*', 'phpinfo*', 'xmlrpc.php',
+    ],
+
+    // How long auto-blocks last (minutes); null = permanent
+    'probe_block_duration' => env('VISITOR_PROBE_BLOCK_DURATION', null),
+
+    // Auto-block IPs that hit this many 404s within the window
+    'probe_404' => [
+        'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 10),
+        'window'    => env('VISITOR_PROBE_404_WINDOW', 5), // minutes
+    ],
+
+    // Verify legitimate search engine bots via reverse DNS
+    'verified_crawlers' => [
+        'enabled'   => env('VISITOR_VERIFIED_CRAWLERS', true),
+        'cache_ttl' => env('VISITOR_CRAWLER_CACHE_TTL', 1440), // minutes
+        'domains'   => [
+            'googlebot.com', 'google.com', 'search.msn.com',
+            'duckduckgo.com', 'applebot.apple.com',
+            'yandex.com', 'yandex.net', 'yandex.ru', 'crawl.baidu.com',
+        ],
     ],
 
     // Retention period for visit records
@@ -324,15 +461,23 @@ Each visit record stores:
 | `query` | Query string |
 | `referrer` | Full referrer URL |
 | `referrer_domain` | Referrer domain only (indexed) |
-| `ip_address` | Visitor IP |
+| `ip_address` | Visitor IP (nullable — off by default) |
 | `country` | ISO 3166-1 alpha-2 country code |
 | `city` | City name |
 | `device_type` | `desktop`, `mobile`, or `tablet` |
 | `browser` | Browser name |
 | `os` | Operating system |
-| `user_id` | Auth user ID (nullable) |
+| `user_agent` | Raw User-Agent string |
+| `header_fingerprint` | Hash of request headers for bot fingerprinting |
+| `bot_name` | Bot/crawler name (null for human visits) |
+| `is_blocked` | `true` when the record is a logged blocked request |
+| `is_verified` | `true` for rDNS-verified crawlers (Google, Bing, etc.) |
+| `is_user` | `true` when an authenticated user was present |
+| `user_id` | Auth user ID (nullable — off by default) |
 | `session_id` | Session ID for unique visitor counting (indexed) |
 | `created_at` | Timestamp (indexed) |
+
+Blocked visit records (`is_blocked = true`) are excluded from all normal queries via a global scope on the `Visit` model. They are only visible in the raw table or when explicitly calling `withoutGlobalScope('exclude_blocked')`.
 
 ## GDPR Considerations
 

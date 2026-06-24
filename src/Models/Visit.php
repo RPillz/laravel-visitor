@@ -30,6 +30,7 @@ class Visit extends Model
         'header_fingerprint',
         'bot_name',
         'is_blocked',
+        'is_verified',
         'is_user',
         'user_id',
         'session_id',
@@ -38,6 +39,7 @@ class Visit extends Model
     protected $casts = [
         'created_at' => 'datetime',
         'is_blocked' => 'boolean',
+        'is_verified' => 'boolean',
         'is_user' => 'boolean',
         'user_id' => 'integer',
     ];

@@ -30,6 +30,7 @@ return new class extends Migration
             $table->string('header_fingerprint', 64)->nullable();
             $table->string('bot_name', 100)->nullable();
             $table->boolean('is_blocked')->default(false)->index();
+            $table->boolean('is_verified')->default(false);
             $table->boolean('is_user')->default(false);
             $table->unsignedBigInteger('user_id')->nullable()->index();
             $table->string('session_id', 100)->nullable()->index();

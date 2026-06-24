@@ -182,11 +182,11 @@ return [
     'log_blocks' => env('VISITOR_LOG_BLOCKS', false),
 
     'probe_paths' => [
-        // 'wp-admin*',
-        // 'wp-login*',
-        // '.env*',
-        // 'phpinfo*',
-        // 'xmlrpc.php',
+         'wp-admin*',
+         'wp-login*',
+         '.env*',
+         'phpinfo*',
+         'xmlrpc.php',
     ],
 
     'probe_block_duration' => env('VISITOR_PROBE_BLOCK_DURATION', null), // minutes, null = permanent
@@ -194,6 +194,34 @@ return [
     'probe_404' => [
         'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 10), // 404s within the window before blocking
         'window' => env('VISITOR_PROBE_404_WINDOW', 5),        // minutes
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Verified Crawlers
+    |--------------------------------------------------------------------------
+    | When enabled, known search engine bots are verified via reverse DNS:
+    | the bot's IP resolves to a hostname, which must forward-resolve back to
+    | the same IP, and the hostname suffix must match an entry in 'domains'.
+    | Verified bots bypass automatic probe-path and 404-rate blocking.
+    |
+    | Results are cached per IP for cache_ttl minutes so DNS lookups only
+    | happen once per unique crawler IP.
+    */
+    'verified_crawlers' => [
+        'enabled' => env('VISITOR_VERIFIED_CRAWLERS', true),
+        'cache_ttl' => env('VISITOR_CRAWLER_CACHE_TTL', 1440), // minutes
+        'domains' => [
+            'googlebot.com',
+            'google.com',
+            'search.msn.com',
+            'duckduckgo.com',
+            'applebot.apple.com',
+            'yandex.com',
+            'yandex.net',
+            'yandex.ru',
+            'crawl.baidu.com',
+        ],
     ],
 
     /*

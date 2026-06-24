@@ -20,6 +20,7 @@ class BotStatsWidget extends StatsOverviewWidget
         $totalVisits = (clone $bots)->count();
         $todayVisits = (clone $bots)->whereDate('created_at', today())->count();
         $last7Days = (clone $bots)->where('created_at', '>=', now()->subDays(7))->count();
+        $verifiedVisits = (clone $bots)->where('is_verified', true)->count();
 
         return [
             Stat::make('Bot Visits', number_format($totalVisits))
@@ -28,6 +29,10 @@ class BotStatsWidget extends StatsOverviewWidget
             Stat::make('Bots Today', number_format($todayVisits))
                 ->description('Last 7 days: '.number_format($last7Days))
                 ->icon('heroicon-o-calendar-days'),
+
+            Stat::make('Verified Crawlers', number_format($verifiedVisits))
+                ->description('rDNS-verified search engines')
+                ->icon('heroicon-o-check-badge'),
         ];
     }
 }

@@ -5,6 +5,7 @@ namespace RPillz\LaravelVisitor\Filament;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 use RPillz\LaravelVisitor\Filament\Pages\VisitorDashboard;
+use RPillz\LaravelVisitor\Filament\Resources\BotListResource;
 use RPillz\LaravelVisitor\Filament\Resources\VisitorIgnoreResource;
 
 class VisitorPlugin implements Plugin
@@ -21,6 +22,7 @@ class VisitorPlugin implements Plugin
                 VisitorDashboard::class,
             ])
             ->resources([
+                BotListResource::class,
                 VisitorIgnoreResource::class,
             ]);
     }

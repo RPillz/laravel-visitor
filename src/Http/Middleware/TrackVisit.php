@@ -12,6 +12,7 @@ use RPillz\LaravelVisitor\LaravelVisitor;
 use RPillz\LaravelVisitor\Models\VisitorIgnore;
 use RPillz\LaravelVisitor\Support\AgentResolver;
 use RPillz\LaravelVisitor\Support\HeaderFingerprint;
+use RPillz\LaravelVisitor\Support\VerifiedCrawlerResolver;
 use Symfony\Component\HttpFoundation\Response;
 
 class TrackVisit
@@ -20,6 +21,7 @@ class TrackVisit
         protected LaravelVisitor $visitor,
         protected AgentResolver $agentResolver,
         protected HeaderFingerprint $headerFingerprint,
+        protected VerifiedCrawlerResolver $verifiedCrawlerResolver,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -28,10 +30,16 @@ class TrackVisit
             return $this->blockResponse($request);
         }
 
-        if (config('visitor.block_probes', true) && $this->isProbe($request)) {
-            $this->autoBlock($request);
+        if (config('visitor.block_probes', true)) {
+            if ($this->isProbe($request) && ! $this->verifiedCrawlerResolver->isVerified($request)) {
+                $this->autoBlock($request);
 
-            return $this->blockResponse($request);
+                return $this->blockResponse($request, 404);
+            }
+
+            if ($this->hasExceeded404RateLimit($request)) {
+                return $this->blockResponse($request, 429);
+            }
         }
 
         return $next($request);
@@ -39,11 +47,15 @@ class TrackVisit
 
     public function terminate(Request $request, Response $response): void
     {
+        $isVerified = $this->verifiedCrawlerResolver->isVerified($request);
+
         if ($this->shouldTrack($request, $response)) {
-            $this->visitor->track($request);
+            ($isVerified ? $this->visitor->verified() : $this->visitor)->track($request);
         }
 
-        $this->maybeBlockFor404s($request, $response);
+        if (! $isVerified) {
+            $this->maybeBlockFor404s($request, $response);
+        }
     }
 
     protected function shouldTrack(Request $request, Response $response): bool
@@ -78,13 +90,28 @@ class TrackVisit
         return true;
     }
 
-    protected function blockResponse(Request $request): Response
+    protected function blockResponse(Request $request, int $status = 403): Response
     {
         if (config('visitor.log_blocks', false)) {
             $this->trackBlocked($request);
         }
 
-        return response('Forbidden', 403);
+        $messages = [403 => 'Forbidden', 404 => 'Not Found', 429 => 'Too Many Requests'];
+
+        return response($messages[$status] ?? '', $status);
+    }
+
+    protected function hasExceeded404RateLimit(Request $request): bool
+    {
+        if (! $request->ip()) {
+            return false;
+        }
+
+        $config = config('visitor.probe_404', []);
+        $threshold = (int) ($config['threshold'] ?? 10);
+        $key = 'visitor_404_'.LaravelVisitor::resolveConnection().'_'.$request->ip();
+
+        return RateLimiter::tooManyAttempts($key, $threshold);
     }
 
     protected function trackBlocked(Request $request): void
