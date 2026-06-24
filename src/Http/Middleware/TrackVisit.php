@@ -20,6 +20,10 @@ class TrackVisit
 
     public function handle(Request $request, Closure $next): Response
     {
+        if ($this->isBlocked($request)) {
+            return response('Forbidden', 403);
+        }
+
         return $next($request);
     }
 
@@ -50,7 +54,7 @@ class TrackVisit
             }
         }
 
-        if (config('visitor.exclude_bots', true) && $request->userAgent()
+        if (! config('visitor.track_bots', true) && $request->userAgent()
             && $this->agentResolver->isBot($request->userAgent())) {
             return false;
         }
@@ -62,23 +66,70 @@ class TrackVisit
         return true;
     }
 
-    protected function isIgnored(Request $request): bool
+    protected function isBlocked(Request $request): bool
     {
-        $list = Cache::remember('visitor.ignore_list.'.LaravelVisitor::resolveConnection(), now()->addMinutes(5), function () {
-            return VisitorIgnore::all()
-                ->groupBy('type')
-                ->map(fn ($items) => $items->pluck('value')->all())
-                ->all();
-        });
+        $list = $this->getIgnoreList();
 
-        if ($request->ip() && in_array($request->ip(), $list['ip'] ?? [])) {
-            return true;
+        if ($request->ip()) {
+            foreach ($list['ip'] ?? [] as $entry) {
+                if ($entry['is_blocked'] && $entry['value'] === $request->ip()) {
+                    return true;
+                }
+            }
         }
 
-        if (auth()->check() && in_array((string) auth()->id(), $list['user_id'] ?? [])) {
-            return true;
+        if (auth()->check()) {
+            foreach ($list['user_id'] ?? [] as $entry) {
+                if ($entry['is_blocked'] && $entry['value'] === (string) auth()->id()) {
+                    return true;
+                }
+            }
+        }
+
+        if ($request->userAgent()) {
+            foreach ($list['user_agent'] ?? [] as $entry) {
+                if ($entry['is_blocked'] && Str::is($entry['value'], $request->userAgent())) {
+                    return true;
+                }
+            }
         }
 
         return false;
+    }
+
+    protected function isIgnored(Request $request): bool
+    {
+        $list = $this->getIgnoreList();
+
+        if ($request->ip() && collect($list['ip'] ?? [])->pluck('value')->contains($request->ip())) {
+            return true;
+        }
+
+        if (auth()->check() && collect($list['user_id'] ?? [])->pluck('value')->contains((string) auth()->id())) {
+            return true;
+        }
+
+        if ($request->userAgent()) {
+            foreach ($list['user_agent'] ?? [] as $entry) {
+                if (Str::is($entry['value'], $request->userAgent())) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    protected function getIgnoreList(): array
+    {
+        return Cache::remember('visitor.ignore_list.'.LaravelVisitor::resolveConnection(), now()->addMinutes(5), function () {
+            return VisitorIgnore::all()
+                ->groupBy('type')
+                ->map(fn ($items) => $items->map(fn ($item) => [
+                    'value' => $item->value,
+                    'is_blocked' => (bool) $item->is_blocked,
+                ])->values()->all())
+                ->all();
+        });
     }
 }

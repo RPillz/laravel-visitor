@@ -28,6 +28,7 @@ class ReferrersWidget extends TableWidget
                 Visit::query()
                     ->selectRaw('referrer_domain, COUNT(*) as visit_count')
                     ->whereNotNull('referrer_domain')
+                    ->whereNull('bot_name')
                     ->groupBy('referrer_domain')
                     ->orderByDesc('visit_count')
                     ->limit(20)

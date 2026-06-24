@@ -10,10 +10,11 @@ class VisitorIgnore extends Model
 {
     const UPDATED_AT = null;
 
-    protected $fillable = ['type', 'value'];
+    protected $fillable = ['type', 'value', 'is_blocked'];
 
     protected $casts = [
         'created_at' => 'datetime',
+        'is_blocked' => 'boolean',
     ];
 
     public function getConnectionName(): string
@@ -29,6 +30,7 @@ class VisitorIgnore extends Model
             $column = match ($ignore->type) {
                 'ip' => 'ip_address',
                 'user_id' => 'user_id',
+                'user_agent' => 'user_agent',
                 default => null,
             };
 

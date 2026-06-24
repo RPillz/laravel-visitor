@@ -40,6 +40,7 @@ it('creates a visit record without touching the geo database', function () {
         ipAddress: null,
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         sessionId: 'abc123',
+        isUser: false,
         userId: null,
     );
 
@@ -60,8 +61,27 @@ it('creates a visit record with no user id when anonymous is true', function () 
         ipAddress: null,
         userAgent: 'Mozilla/5.0',
         sessionId: 'xyz789',
+        isUser: false,
         userId: null,
     );
 
     expect(Visit::first()->user_id)->toBeNull();
+});
+
+it('stores is_user false and no user_id when anonymous is true', function () {
+    TrackVisitJob::dispatchSync(
+        dbConnection: config('visitor.connection', 'visitor'),
+        url: 'https://example.com/',
+        path: '/',
+        query: null,
+        referrer: null,
+        ipAddress: null,
+        userAgent: 'Mozilla/5.0',
+        sessionId: 'xyz789',
+        isUser: false,
+        userId: null,
+    );
+
+    expect(Visit::first()->user_id)->toBeNull()
+        ->and(Visit::first()->is_user)->toBeFalse();
 });

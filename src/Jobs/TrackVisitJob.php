@@ -27,6 +27,7 @@ class TrackVisitJob implements ShouldQueue
         public readonly ?string $ipAddress,
         public readonly ?string $userAgent,
         public readonly ?string $sessionId,
+        public readonly bool $isUser,
         public readonly ?int $userId,
     ) {}
 
@@ -58,6 +59,9 @@ class TrackVisitJob implements ShouldQueue
             'device_type' => $agent['device_type'],
             'browser' => $agent['browser'],
             'os' => $agent['os'],
+            'user_agent' => $this->userAgent,
+            'bot_name' => $agent['bot_name'],
+            'is_user' => $this->isUser,
             'user_id' => $this->userId,
             'session_id' => $this->sessionId,
         ]);

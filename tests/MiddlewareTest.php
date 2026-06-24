@@ -9,7 +9,7 @@ beforeEach(function () {
     config([
         'visitor.anonymous' => true,
         'visitor.store_ip' => false,
-        'visitor.exclude_bots' => true,
+        'visitor.track_bots' => false,
         'visitor.exclude_ips' => [],
         'visitor.track_methods' => ['GET'],
         'visitor.deduplication.enabled' => false,

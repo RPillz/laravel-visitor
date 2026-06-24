@@ -10,19 +10,20 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use RPillz\LaravelVisitor\Models\Visit;
 
-class DevicesWidget extends TableWidget
+class TopBotsWidget extends TableWidget
 {
-    protected static ?string $heading = 'Devices & Browsers';
+    protected static ?string $heading = 'Top Bots';
+
+    public static function canView(): bool
+    {
+        return (bool) config('visitor.track_bots', true);
+    }
 
     protected int|string|array $columnSpan = 'full';
 
     public function getTableRecordKey(Model|array $record): string
     {
-        if (is_array($record)) {
-            return implode('|', [$record['device_type'], $record['browser'], $record['os']]);
-        }
-
-        return implode('|', [$record->device_type, $record->browser, $record->os]);
+        return is_array($record) ? ($record['bot_name'] ?? '') : ($record->bot_name ?? '');
     }
 
     public function table(Table $table): Table
@@ -30,26 +31,15 @@ class DevicesWidget extends TableWidget
         return $table
             ->query(
                 Visit::query()
-                    ->selectRaw('device_type, browser, os, COUNT(*) as visit_count')
-                    ->whereNotNull('device_type')
-                    ->whereNull('bot_name')
-                    ->groupBy('device_type', 'browser', 'os')
+                    ->selectRaw('bot_name, COUNT(*) as visit_count')
+                    ->whereNotNull('bot_name')
+                    ->groupBy('bot_name')
                     ->orderByDesc('visit_count')
                     ->limit(20)
             )
             ->columns([
-                TextColumn::make('device_type')
-                    ->label('Device')
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'mobile' => 'warning',
-                        'tablet' => 'info',
-                        default => 'success',
-                    }),
-                TextColumn::make('browser')
-                    ->label('Browser'),
-                TextColumn::make('os')
-                    ->label('OS'),
+                TextColumn::make('bot_name')
+                    ->label('Bot'),
                 TextColumn::make('visit_count')
                     ->label('Visits')
                     ->sortable(),

@@ -25,12 +25,16 @@ class Visit extends Model
         'device_type',
         'browser',
         'os',
+        'user_agent',
+        'bot_name',
+        'is_user',
         'user_id',
         'session_id',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
+        'is_user' => 'boolean',
         'user_id' => 'integer',
     ];
 

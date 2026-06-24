@@ -90,13 +90,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Bot Filtering
+    | Bot Tracking
     |--------------------------------------------------------------------------
-    | When true, requests detected as bots/crawlers are not tracked.
-    | The check runs in the middleware (before the queue) so bot requests
-    | never consume a queue slot.
+    | When true, requests detected as bots/crawlers are tracked and stored
+    | with their bot_name and user_agent. Set to false to silently drop bot
+    | visits without recording them. The check runs in the middleware (before
+    | the queue) so untracked bot requests never consume a queue slot.
     */
-    'exclude_bots' => true,
+    'track_bots' => env('VISITOR_TRACK_BOTS', true),
 
     /*
     |--------------------------------------------------------------------------

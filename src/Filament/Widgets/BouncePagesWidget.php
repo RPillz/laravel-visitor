@@ -10,19 +10,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use RPillz\LaravelVisitor\Models\Visit;
 
-class DevicesWidget extends TableWidget
+class BouncePagesWidget extends TableWidget
 {
-    protected static ?string $heading = 'Devices & Browsers';
+    protected static ?string $heading = 'Bounce Pages';
 
     protected int|string|array $columnSpan = 'full';
 
     public function getTableRecordKey(Model|array $record): string
     {
-        if (is_array($record)) {
-            return implode('|', [$record['device_type'], $record['browser'], $record['os']]);
-        }
-
-        return implode('|', [$record->device_type, $record->browser, $record->os]);
+        return is_array($record) ? $record['path'] : $record->path;
     }
 
     public function table(Table $table): Table
@@ -30,28 +26,27 @@ class DevicesWidget extends TableWidget
         return $table
             ->query(
                 Visit::query()
-                    ->selectRaw('device_type, browser, os, COUNT(*) as visit_count')
-                    ->whereNotNull('device_type')
+                    ->selectRaw('path, COUNT(*) as bounce_count')
                     ->whereNull('bot_name')
-                    ->groupBy('device_type', 'browser', 'os')
-                    ->orderByDesc('visit_count')
+                    ->whereNotNull('session_id')
+                    ->whereIn('session_id', function ($query) {
+                        $query->select('session_id')
+                            ->from('visits')
+                            ->whereNotNull('session_id')
+                            ->whereNull('bot_name')
+                            ->groupBy('session_id')
+                            ->havingRaw('COUNT(*) = 1');
+                    })
+                    ->groupBy('path')
+                    ->orderByDesc('bounce_count')
                     ->limit(20)
             )
             ->columns([
-                TextColumn::make('device_type')
-                    ->label('Device')
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'mobile' => 'warning',
-                        'tablet' => 'info',
-                        default => 'success',
-                    }),
-                TextColumn::make('browser')
-                    ->label('Browser'),
-                TextColumn::make('os')
-                    ->label('OS'),
-                TextColumn::make('visit_count')
-                    ->label('Visits')
+                TextColumn::make('path')
+                    ->label('Page')
+                    ->searchable(),
+                TextColumn::make('bounce_count')
+                    ->label('Bounces')
                     ->sortable(),
             ])
             ->filters([

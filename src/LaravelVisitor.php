@@ -68,6 +68,7 @@ class LaravelVisitor
             ipAddress: config('visitor.store_ip', true) ? $request->ip() : null,
             userAgent: $request->userAgent(),
             sessionId: $sessionId,
+            isUser: auth()->check(),
             userId: (! $anonymous && auth()->check()) ? auth()->id() : null,
         )
             ->onConnection(config('visitor.queue.connection'))

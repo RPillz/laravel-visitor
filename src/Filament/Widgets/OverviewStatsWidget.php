@@ -10,10 +10,12 @@ class OverviewStatsWidget extends StatsOverviewWidget
 {
     protected function getStats(): array
     {
-        $totalVisits = Visit::count();
-        $uniqueVisitors = Visit::whereNotNull('session_id')->distinct('session_id')->count('session_id');
-        $todayVisits = Visit::whereDate('created_at', today())->count();
-        $last7Days = Visit::where('created_at', '>=', now()->subDays(7))->count();
+        $human = Visit::whereNull('bot_name');
+
+        $totalVisits = (clone $human)->count();
+        $uniqueVisitors = (clone $human)->whereNotNull('session_id')->distinct('session_id')->count('session_id');
+        $todayVisits = (clone $human)->whereDate('created_at', today())->count();
+        $last7Days = (clone $human)->where('created_at', '>=', now()->subDays(7))->count();
 
         return [
             Stat::make('Total Visits', number_format($totalVisits))

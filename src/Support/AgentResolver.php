@@ -28,6 +28,7 @@ class AgentResolver
             'browser' => $agent->browser() ?: null,
             'os' => $agent->platform() ?: null,
             'is_robot' => $agent->isRobot(),
+            'bot_name' => $agent->isRobot() ? ($agent->robot() ?: null) : null,
         ];
     }
 }

@@ -27,6 +27,7 @@ class TopPagesWidget extends TableWidget
             ->query(
                 Visit::query()
                     ->selectRaw('path, COUNT(*) as visit_count')
+                    ->whereNull('bot_name')
                     ->groupBy('path')
                     ->orderByDesc('visit_count')
                     ->limit(20)
