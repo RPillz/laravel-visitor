@@ -29,17 +29,20 @@ class TopBotsWidget extends TableWidget
     {
         return $table
             ->query(
-                Visit::query()
-                    ->selectRaw('bot_name, COUNT(*) as visit_count, MAX(is_verified) as is_verified')
+                Visit::withoutGlobalScope('exclude_blocked')
+                    ->selectRaw('bot_name, COUNT(*) as total_count, SUM(CASE WHEN is_blocked = 0 THEN 1 ELSE 0 END) as allowed_count, SUM(CASE WHEN is_blocked = 1 THEN 1 ELSE 0 END) as blocked_count, MAX(is_verified) as is_verified')
                     ->whereNotNull('bot_name')
                     ->groupBy('bot_name')
-                    ->orderByDesc('visit_count')
+                    ->orderByDesc('total_count')
             )
             ->columns([
                 TextColumn::make('bot_name')
                     ->label('Bot'),
-                TextColumn::make('visit_count')
-                    ->label('Visits')
+                TextColumn::make('allowed_count')
+                    ->label('Allowed')
+                    ->sortable(),
+                TextColumn::make('blocked_count')
+                    ->label('Blocked')
                     ->sortable(),
                 IconColumn::make('is_verified')
                     ->label('Verified')

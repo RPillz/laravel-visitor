@@ -221,6 +221,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Allow Agents
+    |--------------------------------------------------------------------------
+    | Substrings listed here are never blocked by block_verified_bots or
+    | block_unverified_bots, even when the crawler cannot be verified via
+    | rDNS or a published IP list. Each value is matched as a substring of
+    | the User-Agent (wildcards are added automatically — no need to add *).
+    |
+    | Use this for uptime monitors, internal crawlers, or other trusted services
+    | whose IP addresses are not published and cannot be verified automatically.
+    */
+    'allow_agents' => [
+        'Phare', // an uptime monitor
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Request Rate Limiting (by header fingerprint)
     |--------------------------------------------------------------------------
     | Limits the total number of requests from a given header fingerprint

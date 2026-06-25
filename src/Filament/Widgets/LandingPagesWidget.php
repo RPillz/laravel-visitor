@@ -22,6 +22,7 @@ class LandingPagesWidget extends TableWidget
     public function table(Table $table): Table
     {
         return $table
+            ->description('Entry pages for multi-page sessions.')
             ->query(
                 Visit::query()
                     ->selectRaw('path, COUNT(*) as entry_count')
@@ -32,7 +33,8 @@ class LandingPagesWidget extends TableWidget
                             ->from('visits')
                             ->whereNotNull('session_id')
                             ->whereNull('bot_name')
-                            ->groupBy('session_id');
+                            ->groupBy('session_id')
+                            ->havingRaw('COUNT(*) > 1');
                     })
                     ->groupBy('path')
                     ->orderByDesc('entry_count')

@@ -24,6 +24,7 @@ Since we're checking all the visits anyway we can also track, and potentially bl
 - **Verified crawler passthrough** — search engines (Google, Bing, etc.) verified via rDNS or published IP lists bypass auto-blocking
 - **Bot name blocking** — blocks known scrapers and AI crawlers by name, even when IP-verified
 - **Unverified bot blocking** — blocks any crawler that cannot prove its identity
+- **Agent allow-list** — exempt specific User-Agent substrings (uptime monitors, internal crawlers) from bot-name blocking
 - **Managed robots.txt** — optionally serve `/robots.txt` with `Disallow` rules via config
 - **Database-driven ignore/block list** — block by IP, user ID, user agent wildcard, or header fingerprint via Filament UI; soft-ignore or hard-block (403 returned); temporary or permanent
 - **Block logging** — records blocked requests for auditing
@@ -304,6 +305,19 @@ Even verified crawlers can be blocked by name. `block_verified_bots` lists bot n
 
 Search engines (Googlebot, Bingbot, etc.) are not in the `block_verified_bots` list by default — leave them unblocked so they continue to index your site.
 
+### Allowing specific agents
+
+Uptime monitors, internal crawlers, and other trusted services may be detected as bots but publish no IP list and have no rDNS to verify against. Add a substring of their User-Agent to `allow_agents` to let them through regardless of verification status:
+
+```php
+'allow_agents' => [
+    'Phare',           // Phare uptime monitor
+    'UptimeRobot',     // UptimeRobot
+],
+```
+
+Each value is matched as a case-sensitive substring of the User-Agent string. An agent in this list bypasses both `block_verified_bots` and `block_unverified_bots` — it is never blocked by bot-name checks, though explicit IP/fingerprint/user-agent blocks in the ignore list still apply.
+
 ### Request rate limiting
 
 The fingerprint rate limiter counts every request from a given header fingerprint within a rolling window, catching high-volume scrapers that only hit valid pages (and would never trigger the 404 limiter):
@@ -475,6 +489,11 @@ return [
 
     // Block any crawler that cannot be verified via rDNS or a published IP list
     'block_unverified_bots' => env('VISITOR_BLOCK_UNVERIFIED_BOTS', true),
+
+    // User-Agent substrings that bypass block_verified_bots and block_unverified_bots
+    'allow_agents' => [
+        // 'Phare',
+    ],
 
     // Fingerprint-based rate limiter — catches high-volume scrapers that hit only valid pages
     'rate_limit' => [

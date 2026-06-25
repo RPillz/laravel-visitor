@@ -22,6 +22,7 @@ class BouncePagesWidget extends TableWidget
     public function table(Table $table): Table
     {
         return $table
+            ->description('Pages where visitors viewed only one page and left.')
             ->query(
                 Visit::query()
                     ->selectRaw('path, COUNT(*) as bounce_count')

@@ -10,6 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 const SEMRUSH_UA = 'Mozilla/5.0 (compatible; SemrushBot/7~bl; +http://www.semrush.com/bot.html)';
 const CLAUDEBOT_UA = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)';
 const GOOGLEBOT_UA_BLOCK = 'Googlebot/2.1 (+http://www.google.com/bot.html)';
+const PHARE_UA = 'Mozilla/5.0 (compatible; Phare/1.0; +https://phare.io/products/uptime)';
 
 beforeEach(function () {
     config([
@@ -165,6 +166,64 @@ it('block_verified_bots blocks even when verification passes', function () {
     $request = Request::create('https://example.com/about', 'GET', [], [], [], [
         'REMOTE_ADDR' => '1.2.3.4',
         'HTTP_USER_AGENT' => SEMRUSH_UA,
+    ]);
+
+    $response = app(TrackVisit::class)->handle($request, fn () => new Response('OK', 200));
+
+    expect($response->getStatusCode())->toBe(403);
+});
+
+// --- allow_agents ---
+
+it('allows an agent matching allow_agents through block_unverified_bots', function () {
+    config([
+        'visitor.block_unverified_bots' => true,
+        'visitor.allow_agents' => ['Phare'],
+    ]);
+
+    app()->instance(VerifiedCrawlerResolver::class, new class extends VerifiedCrawlerResolver {
+        public function isVerified(Request $request): bool { return false; }
+    });
+
+    $request = Request::create('https://example.com/', 'GET', [], [], [], [
+        'REMOTE_ADDR' => '1.2.3.4',
+        'HTTP_USER_AGENT' => PHARE_UA,
+    ]);
+
+    $response = app(TrackVisit::class)->handle($request, fn () => new Response('OK', 200));
+
+    expect($response->getStatusCode())->toBe(200);
+});
+
+it('allows an agent matching allow_agents through block_verified_bots', function () {
+    config([
+        'visitor.block_verified_bots' => ['Semrush'],
+        'visitor.allow_agents' => ['SemrushBot'],
+    ]);
+
+    $request = Request::create('https://example.com/', 'GET', [], [], [], [
+        'REMOTE_ADDR' => '1.2.3.4',
+        'HTTP_USER_AGENT' => SEMRUSH_UA,
+    ]);
+
+    $response = app(TrackVisit::class)->handle($request, fn () => new Response('OK', 200));
+
+    expect($response->getStatusCode())->toBe(200);
+});
+
+it('still blocks agents not matching allow_agents when block_unverified_bots is true', function () {
+    config([
+        'visitor.block_unverified_bots' => true,
+        'visitor.allow_agents' => ['Phare'],
+    ]);
+
+    app()->instance(VerifiedCrawlerResolver::class, new class extends VerifiedCrawlerResolver {
+        public function isVerified(Request $request): bool { return false; }
+    });
+
+    $request = Request::create('https://example.com/', 'GET', [], [], [], [
+        'REMOTE_ADDR' => '1.2.3.4',
+        'HTTP_USER_AGENT' => CLAUDEBOT_UA,
     ]);
 
     $response = app(TrackVisit::class)->handle($request, fn () => new Response('OK', 200));

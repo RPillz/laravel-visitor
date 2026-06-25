@@ -178,6 +178,7 @@ class TrackVisit
             isUser: auth()->check(),
             userId: (! $anonymous && auth()->check()) ? auth()->id() : null,
             isBlocked: true,
+            isVerified: $this->verifiedCrawlerResolver->isVerified($request),
             headerFingerprint: $this->headerFingerprint->compute($request),
             looksLikeBrowser: $this->headerFingerprint->looksLikeBrowser($request),
         )
@@ -293,14 +294,18 @@ class TrackVisit
         $blockUnverified = config('visitor.block_unverified_bots', false);
 
         if (($blockNames || $blockUnverified) && $request->userAgent()) {
-            $botName = $this->agentResolver->botName($request->userAgent());
+            $allowAgents = array_map(fn ($p) => '*'.$p.'*', config('visitor.allow_agents', []));
 
-            if ($botName && in_array($botName, $blockNames, true)) {
-                return true;
-            }
+            if (! $allowAgents || ! Str::is($allowAgents, $request->userAgent())) {
+                $botName = $this->agentResolver->botName($request->userAgent());
 
-            if ($botName && $blockUnverified && ! $this->verifiedCrawlerResolver->isVerified($request)) {
-                return true;
+                if ($botName && in_array($botName, $blockNames, true)) {
+                    return true;
+                }
+
+                if ($botName && $blockUnverified && ! $this->verifiedCrawlerResolver->isVerified($request)) {
+                    return true;
+                }
             }
         }
 
