@@ -158,12 +158,111 @@ return [
     | Resolves country and city from IP addresses using a local MaxMind
     | GeoLite2-City.mmdb file. No external API calls at runtime.
     |
-    | Download the free database at: https://dev.maxmind.com/geoip/geolite2-free-geolocation-data
+    | Download the free database at: https://dev.maxmind.com/geoip/geolite2-free-geolection-data
     | Place it at the path below (or override VISITOR_GEOIP_DATABASE).
     */
     'geoip' => [
-        'enabled' => env('VISITOR_GEOIP_ENABLED', true),
+        'enabled' => env('VISITOR_GEOIP_ENABLED', false),
         'database' => env('VISITOR_GEOIP_DATABASE', storage_path('app/geoip/GeoLite2-City.mmdb')),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Block Verified Bots
+    |--------------------------------------------------------------------------
+    | Bot names listed here are blocked even when the crawler can be verified
+    | via rDNS or a published IP list. The name is resolved from the User-Agent
+    | string by jenssegers/agent. Comment out any bots you want to allow.
+    |
+    | Note: search engines (Googlebot, Bingbot, etc.) are not listed here —
+    | leave them verified and unblocked so they continue to index your site.
+    */
+    'block_verified_bots' => [
+        // AI training / content scrapers
+        'ClaudeBot',        // Anthropic
+        'GPTBot',           // OpenAI
+        'PerplexityBot',    // Perplexity AI
+        'Amazonbot',        // Amazon
+        'CCBot',            // Common Crawl (primary AI training corpus)
+        'Bytespider',       // ByteDance / TikTok
+
+        // Meta crawlers
+        // 'Facebookexternalhit',  // Meta social preview
+        'Meta-WebIndexer',      // Meta web indexer
+        'Meta-ExternalAds',     // Meta ads crawler
+        'Meta-ExternalAgent',   // Meta external agent
+        // 'Meta-ExternalFetcher', // Meta user-directed fetcher (may be useful for recommendations)
+
+        // Commercial SEO / link-analysis scrapers
+        'Semrush',   // SEMrush
+        'Ahrefs',    // Ahrefs
+        'DotBot',    // Moz
+        'MJ12bot',   // Majestic
+        'Diffbot',   // Diffbot
+        'PetalBot',  // Huawei / PetalSearch
+
+        // Generic scraping tools
+        'Scrapy',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Block Unverified Bots
+    |--------------------------------------------------------------------------
+    | When true, any request from a crawler that self-identifies by name in
+    | its User-Agent but cannot be verified (via rDNS domain match or a
+    | published IP list) is blocked. Bots that pass verification — such as
+    | Googlebot — are allowed through regardless of this setting.
+    |
+    | Use this as a catch-all for unknown crawlers that are not covered by
+    | block_verified_bots but also cannot prove their identity.
+    */
+    'block_unverified_bots' => env('VISITOR_BLOCK_UNVERIFIED_BOTS', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Request Rate Limiting (by header fingerprint)
+    |--------------------------------------------------------------------------
+    | Limits the total number of requests from a given header fingerprint
+    | within the configured window. Unlike the probe_404 limiter (which only
+    | counts 404s), this counts every request and therefore catches high-volume
+    | scrapers that hit only valid pages.
+    |
+    | When auto_block is true, a fingerprint that exceeds the threshold is
+    | written to visitor_ignores so subsequent requests are caught by the
+    | isBlocked() check rather than re-counted by the rate limiter.
+    */
+    'rate_limit' => [
+        'enabled' => env('VISITOR_RATE_LIMIT', true),
+        'threshold' => env('VISITOR_RATE_LIMIT_THRESHOLD', 60), // requests per window
+        'window' => env('VISITOR_RATE_LIMIT_WINDOW', 1),        // minutes
+        'auto_block' => env('VISITOR_RATE_LIMIT_AUTO_BLOCK', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | robots.txt
+    |--------------------------------------------------------------------------
+    | When enabled, the package serves GET /robots.txt with Disallow: / entries
+    | for each listed User-agent. Leave disabled (the default) if your
+    | application already manages its own robots.txt.
+    |
+    | Add 'robots.txt' to exclude_paths above if you do not want these hits
+    | recorded in your visit analytics.
+    */
+    'robots_txt' => [
+        'enabled' => env('VISITOR_ROBOTS_TXT', false),
+        'disallow' => [
+            'ClaudeBot',
+            'Amazonbot',
+            'meta-externalagent',
+            'meta-webindexer',
+            'meta-externalads',
+            'GPTBot',
+            'Google-Extended',
+            'PerplexityBot',
+            'CCBot',
+        ],
     ],
 
     /*
@@ -192,7 +291,7 @@ return [
     'probe_block_duration' => env('VISITOR_PROBE_BLOCK_DURATION', 60*24*3), // minutes, null = permanent
 
     'probe_404' => [
-        'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 10), // 404s within the window before blocking
+        'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 5), // 404s within the window before blocking
         'window' => env('VISITOR_PROBE_404_WINDOW', 3),        // minutes
     ],
 
@@ -200,33 +299,30 @@ return [
     |--------------------------------------------------------------------------
     | Verified Crawlers
     |--------------------------------------------------------------------------
-    | When enabled, known search engine bots are verified via reverse DNS:
-    | the bot's IP resolves to a hostname, which must forward-resolve back to
-    | the same IP, and the hostname suffix must match an entry in 'domains'.
-    | Verified bots bypass automatic probe-path and 404-rate blocking.
+    | When enabled, known crawlers are verified via two methods:
     |
-    | Results are cached per IP for cache_ttl minutes so DNS lookups only
-    | happen once per unique crawler IP.
+    |   rDNS: the bot's IP resolves to a hostname that forward-resolves back
+    |   to the same IP, with the suffix matching a known search engine domain
+    |   (Googlebot, Bingbot, DuckDuckBot, etc.). These domains are hardcoded
+    |   in VerifiedCrawlerResolver and do not need configuration.
+    |
+    |   IP lists: the bot's IP is checked against CIDR prefix lists published
+    |   by crawler operators. The list is fetched once and cached for
+    |   cache_ttl minutes.
+    |
+    | Verified bots bypass automatic probe-path and 404-rate blocking, and
+    | are not subject to block_unverified_bots or fingerprint rate limiting.
+    |
+    | Results are cached per IP for cache_ttl minutes.
     */
     'verified_crawlers' => [
         'enabled' => env('VISITOR_VERIFIED_CRAWLERS', true),
         'cache_ttl' => env('VISITOR_CRAWLER_CACHE_TTL', 1440), // minutes
-        'domains' => [
-            'googlebot.com',
-            'google.com',
-            'search.msn.com',
-            'duckduckgo.com',
-            'applebot.apple.com',
-            'yandex.com',
-            'yandex.net',
-            'yandex.ru',
-            'crawl.baidu.com',
-            'bot.amazon.com',
-            'openai.com',
-            'anthropic.com',
-            'petalsearch.com',
-            'qwant.com',
-            'facebook.com',
+        'ip_lists' => [
+            // hexydec/ip-ranges: daily-updated crawler IP ranges for ClaudeBot, BingBot,
+            // Meta, GPTBot, Perplexity, and others in a single file.
+            // Also accepts Anthropic's own format: https://claude.com/crawling/bots.json
+            'https://raw.githubusercontent.com/hexydec/ip-ranges/main/output/crawlers.json',
         ],
     ],
 

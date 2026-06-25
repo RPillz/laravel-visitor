@@ -19,10 +19,14 @@ Since we're checking all the visits anyway we can also track, and potentially bl
 - **Bot tracking** — records bots with their name and header fingerprint; unidentified non-browser requests labelled automatically
 - **Probe path blocking** — auto-blocks scanners hitting known attack paths (wp-admin, .env, etc.)
 - **404 rate-limit blocking** — auto-blocks IPs that rack up too many 404s in a short window
+- **Request rate limiting** — auto-blocks fingerprints that exceed a per-minute request threshold
 - **Header fingerprinting** — tracks and blocks bots that rotate IPs
-- **Verified crawler passthrough** — rDNS-verified search engines (Google, Bing, etc.) bypass auto-blocking
+- **Verified crawler passthrough** — search engines (Google, Bing, etc.) verified via rDNS or published IP lists bypass auto-blocking
+- **Bot name blocking** — blocks known scrapers and AI crawlers by name, even when IP-verified
+- **Unverified bot blocking** — blocks any crawler that cannot prove its identity
+- **Managed robots.txt** — optionally serve `/robots.txt` with `Disallow` rules via config
 - **Database-driven ignore/block list** — block by IP, user ID, user agent wildcard, or header fingerprint via Filament UI; soft-ignore or hard-block (403 returned); temporary or permanent
-- **Block logging** — optionally record blocked requests for auditing
+- **Block logging** — records blocked requests for auditing
 - **Filament v5 plugin** with an analytics dashboard and bot management: stats overview, visits chart, top pages, referrers, device breakdown, bot stats, bot list, and ignore/block list management
 
 ## Requirements
@@ -118,7 +122,7 @@ Country and city resolution uses a local MaxMind GeoLite2 database. Download the
 storage/app/geoip/GeoLite2-City.mmdb
 ```
 
-Override the path via `VISITOR_GEOIP_DATABASE` or in the config. Geo resolution is silently skipped if the file is absent.
+Override the path via `VISITOR_GEOIP_DATABASE` or in the config. Geo resolution is disabled by default — enable it with `VISITOR_GEOIP_ENABLED=true`. It is silently skipped if the database file is absent.
 
 ## Usage
 
@@ -209,7 +213,7 @@ Schedule the prune command to keep your database tidy:
 Schedule::command('visitor:prune')->daily();
 ```
 
-The default retention period is 365 days. Override per-run:
+The default retention period is 90 days. Override per-run:
 
 ```bash
 php artisan visitor:prune --days=90
@@ -237,10 +241,10 @@ Configure the paths and block duration in `config/visitor.php`:
     // add your own patterns — supports * and ? wildcards
 ],
 
-'probe_block_duration' => null, // minutes, null = permanent block
+'probe_block_duration' => env('VISITOR_PROBE_BLOCK_DURATION', 60*24*3), // minutes, null = permanent
 ```
 
-Set `VISITOR_BLOCK_PROBES=false` to disable probe blocking without touching the config file.
+The default block duration is 3 days (4320 minutes). Set to `null` for a permanent block, or use `VISITOR_PROBE_BLOCK_DURATION` to override. Set `VISITOR_BLOCK_PROBES=false` to disable probe blocking without touching the config file.
 
 ### 404 rate-limit blocking
 
@@ -248,8 +252,8 @@ IPs that generate too many 404 responses in a short window are automatically blo
 
 ```php
 'probe_404' => [
-    'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 10), // 404s before blocking
-    'window'    => env('VISITOR_PROBE_404_WINDOW', 5),     // rolling window in minutes
+    'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 5), // 404s before blocking
+    'window'    => env('VISITOR_PROBE_404_WINDOW', 3),    // rolling window in minutes
 ],
 ```
 
@@ -263,54 +267,83 @@ Manual blocks via the Filament **Bot List** resource also prefer fingerprint-bas
 
 ### Verified crawlers
 
-Legitimate search engine bots verify themselves via reverse DNS. When `verified_crawlers` is enabled, the middleware checks whether the requesting IP reverse-resolves to a hostname that forward-resolves back to the same IP and whose suffix matches a known crawler domain. Verified bots bypass probe-path and 404-rate blocking entirely, and their visits are stored with `is_verified = true`.
+When `verified_crawlers` is enabled, the middleware attempts to verify a crawler using two methods:
+
+- **rDNS** — the bot's IP reverse-resolves to a hostname that forward-resolves back to the same IP, with a suffix matching a known search engine domain (Googlebot, Bingbot, DuckDuckBot, Yandex, Baidu, Applebot, Qwant, PetalSearch). These domains are hardcoded and do not need configuration.
+- **IP lists** — the bot's IP is checked against CIDR prefix lists published by crawler operators. The default list covers ClaudeBot, BingBot, Meta crawlers, GPTBot, Perplexity, and others.
+
+Verified bots bypass probe-path and 404-rate blocking and fingerprint rate limiting. Their visits are stored with `is_verified = true`.
 
 ```php
 'verified_crawlers' => [
     'enabled'   => env('VISITOR_VERIFIED_CRAWLERS', true),
     'cache_ttl' => env('VISITOR_CRAWLER_CACHE_TTL', 1440), // minutes per IP
-    'domains'   => [
-        'googlebot.com',
-        'google.com',
-        'search.msn.com',
-        'duckduckgo.com',
-        'applebot.apple.com',
-        'yandex.com', 'yandex.net', 'yandex.ru',
-        'crawl.baidu.com',
+    'ip_lists'  => [
+        'https://raw.githubusercontent.com/hexydec/ip-ranges/main/output/crawlers.json',
     ],
 ],
 ```
 
-DNS results are cached per IP for `cache_ttl` minutes so verification only runs once per unique crawler address.
+Verification results are cached per IP for `cache_ttl` minutes. IP list responses are cached for 24 hours.
 
-### Discouraging scraper bots with robots.txt
+### Bot name blocking
 
-Commercial SEO crawlers (Semrush, Ahrefs, Majestic, Moz, etc.) and aggressive scrapers provide no SEO or indexing benefit to your site — they exist to gather data for their own platforms. A `robots.txt` `Disallow` rule won't stop a bot that ignores it, but most of the named commercial crawlers do respect it.
+Even verified crawlers can be blocked by name. `block_verified_bots` lists bot names (resolved from the User-Agent) that are rejected regardless of verification status. `block_unverified_bots` rejects any crawler that identifies itself by name but cannot be verified:
 
-```
-# /public/robots.txt
+```php
+// Blocked by name, even if IP-verified
+'block_verified_bots' => [
+    'ClaudeBot', 'GPTBot', 'PerplexityBot', 'Amazonbot', 'CCBot', 'Bytespider',
+    'Meta-WebIndexer', 'Meta-ExternalAds', 'Meta-ExternalAgent',
+    'Semrush', 'Ahrefs', 'DotBot', 'MJ12bot', 'Diffbot', 'PetalBot', 'Scrapy',
+],
 
-User-agent: SemrushBot
-User-agent: AhrefsBot
-User-agent: MJ12bot
-User-agent: DotBot
-User-agent: BLEXBot
-User-agent: DataForSeoBot
-User-agent: MauiBot
-User-agent: Bytespider
-User-agent: TikTokSpider
-User-agent: PetalBot
-Disallow: /
+// Block any crawler that cannot prove its identity (default: true)
+'block_unverified_bots' => env('VISITOR_BLOCK_UNVERIFIED_BOTS', true),
 ```
 
-Bots that ignore `robots.txt` are exactly the kind of traffic this package's probe-path blocking and 404 rate-limiting are designed to catch.
+Search engines (Googlebot, Bingbot, etc.) are not in the `block_verified_bots` list by default — leave them unblocked so they continue to index your site.
+
+### Request rate limiting
+
+The fingerprint rate limiter counts every request from a given header fingerprint within a rolling window, catching high-volume scrapers that only hit valid pages (and would never trigger the 404 limiter):
+
+```php
+'rate_limit' => [
+    'enabled'    => env('VISITOR_RATE_LIMIT', true),
+    'threshold'  => env('VISITOR_RATE_LIMIT_THRESHOLD', 60), // requests per window
+    'window'     => env('VISITOR_RATE_LIMIT_WINDOW', 1),     // minutes
+    'auto_block' => env('VISITOR_RATE_LIMIT_AUTO_BLOCK', true),
+],
+```
+
+When `auto_block` is true, a fingerprint that exceeds the threshold is written to the block list so subsequent requests are caught by `isBlocked()` immediately — no further rate-limiter checks needed.
+
+### robots.txt
+
+The package can serve `GET /robots.txt` with `Disallow: /` entries for each listed User-agent. Useful for discouraging commercial SEO crawlers and AI scrapers that do respect `robots.txt`:
+
+```php
+'robots_txt' => [
+    'enabled' => env('VISITOR_ROBOTS_TXT', false),
+    'disallow' => [
+        'ClaudeBot', 'Amazonbot', 'meta-externalagent',
+        'meta-webindexer', 'meta-externalads',
+        'GPTBot', 'Google-Extended', 'PerplexityBot', 'CCBot',
+    ],
+],
+```
+
+Leave `enabled` as `false` (the default) if your application already manages its own `robots.txt`. If you enable this, add `robots.txt` to `exclude_paths` so those hits are not recorded in your visit analytics.
+
+Bots that ignore `robots.txt` are exactly the kind of traffic the probe-path, 404-rate, and fingerprint-rate blocking are designed to catch.
 
 ### Block logging
 
-To record blocked requests for auditing, enable block logging:
+Blocked requests are recorded by default for auditing. Disable if you do not need the log:
 
 ```php
-'log_blocks' => env('VISITOR_LOG_BLOCKS', false),
+'log_blocks' => env('VISITOR_LOG_BLOCKS', true),
 ```
 
 When enabled, blocked requests are dispatched to the queue and stored as visit records with `is_blocked = true`. The `Visit` model's default global scope excludes these from all normal queries, so they never appear in analytics — only in the raw table.
@@ -427,17 +460,45 @@ return [
         'window'  => env('VISITOR_DEDUP_WINDOW', 30), // minutes
     ],
 
-    // Local MaxMind GeoLite2 database for country/city resolution
+    // Local MaxMind GeoLite2 database for country/city resolution (disabled by default)
     'geoip' => [
-        'enabled'  => env('VISITOR_GEOIP_ENABLED', true),
+        'enabled'  => env('VISITOR_GEOIP_ENABLED', false),
         'database' => env('VISITOR_GEOIP_DATABASE', storage_path('app/geoip/GeoLite2-City.mmdb')),
+    ],
+
+    // Bot names (resolved from User-Agent) to block even when IP-verified
+    'block_verified_bots' => [
+        'ClaudeBot', 'GPTBot', 'PerplexityBot', 'Amazonbot', 'CCBot', 'Bytespider',
+        'Meta-WebIndexer', 'Meta-ExternalAds', 'Meta-ExternalAgent',
+        'Semrush', 'Ahrefs', 'DotBot', 'MJ12bot', 'Diffbot', 'PetalBot', 'Scrapy',
+    ],
+
+    // Block any crawler that cannot be verified via rDNS or a published IP list
+    'block_unverified_bots' => env('VISITOR_BLOCK_UNVERIFIED_BOTS', true),
+
+    // Fingerprint-based rate limiter — catches high-volume scrapers that hit only valid pages
+    'rate_limit' => [
+        'enabled'    => env('VISITOR_RATE_LIMIT', true),
+        'threshold'  => env('VISITOR_RATE_LIMIT_THRESHOLD', 60), // requests per window
+        'window'     => env('VISITOR_RATE_LIMIT_WINDOW', 1),     // minutes
+        'auto_block' => env('VISITOR_RATE_LIMIT_AUTO_BLOCK', true),
+    ],
+
+    // Serve GET /robots.txt with Disallow entries for each listed User-agent
+    'robots_txt' => [
+        'enabled' => env('VISITOR_ROBOTS_TXT', false),
+        'disallow' => [
+            'ClaudeBot', 'Amazonbot', 'meta-externalagent',
+            'meta-webindexer', 'meta-externalads',
+            'GPTBot', 'Google-Extended', 'PerplexityBot', 'CCBot',
+        ],
     ],
 
     // Auto-block IPs and fingerprints that hit probe paths; return 404
     'block_probes' => env('VISITOR_BLOCK_PROBES', true),
 
     // Record blocked requests as visits with is_blocked=true (excluded from analytics)
-    'log_blocks' => env('VISITOR_LOG_BLOCKS', false),
+    'log_blocks' => env('VISITOR_LOG_BLOCKS', true),
 
     // Paths treated as probe/scanner activity (supports wildcards)
     'probe_paths' => [
@@ -445,29 +506,27 @@ return [
     ],
 
     // How long auto-blocks last (minutes); null = permanent
-    'probe_block_duration' => env('VISITOR_PROBE_BLOCK_DURATION', null),
+    'probe_block_duration' => env('VISITOR_PROBE_BLOCK_DURATION', 60 * 24 * 3), // 3 days
 
     // Auto-block IPs that hit this many 404s within the window
     'probe_404' => [
-        'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 10),
-        'window'    => env('VISITOR_PROBE_404_WINDOW', 5), // minutes
+        'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 5),
+        'window'    => env('VISITOR_PROBE_404_WINDOW', 3), // minutes
     ],
 
-    // Verify legitimate search engine bots via reverse DNS
+    // Verify legitimate search engine bots via rDNS and published IP lists
     'verified_crawlers' => [
         'enabled'   => env('VISITOR_VERIFIED_CRAWLERS', true),
-        'cache_ttl' => env('VISITOR_CRAWLER_CACHE_TTL', 1440), // minutes
-        'domains'   => [
-            'googlebot.com', 'google.com', 'search.msn.com',
-            'duckduckgo.com', 'applebot.apple.com',
-            'yandex.com', 'yandex.net', 'yandex.ru', 'crawl.baidu.com',
+        'cache_ttl' => env('VISITOR_CRAWLER_CACHE_TTL', 1440), // minutes per IP
+        'ip_lists'  => [
+            'https://raw.githubusercontent.com/hexydec/ip-ranges/main/output/crawlers.json',
         ],
     ],
 
     // Retention period for visit records
     'pruning' => [
         'enabled' => true,
-        'days'    => env('VISITOR_PRUNE_DAYS', 365),
+        'days'    => env('VISITOR_PRUNE_DAYS', 90),
     ],
 ];
 ```
@@ -550,7 +609,7 @@ Set a retention period and schedule the prune command so old records are automat
 
 ```php
 // config/visitor.php
-'pruning' => ['enabled' => true, 'days' => 365],
+'pruning' => ['enabled' => true, 'days' => 90],
 ```
 
 ```php

@@ -3,6 +3,7 @@
 namespace RPillz\LaravelVisitor;
 
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use RPillz\LaravelVisitor\Commands\ForgetVisitorCommand;
 use RPillz\LaravelVisitor\Commands\InstallVisitorCommand;
 use RPillz\LaravelVisitor\Commands\PruneVisitsCommand;
@@ -83,6 +84,21 @@ class LaravelVisitorServiceProvider extends PackageServiceProvider
         if (config('visitor.auto_track', true)) {
             $this->app['router']->pushMiddlewareToGroup('web', TrackVisit::class);
         }
+
+        Route::get('robots.txt', function () {
+            if (! config('visitor.robots_txt.enabled', false)) {
+                abort(404);
+            }
+
+            $lines = [];
+            foreach (config('visitor.robots_txt.disallow', []) as $agent) {
+                $lines[] = "User-agent: {$agent}";
+                $lines[] = 'Disallow: /';
+                $lines[] = '';
+            }
+
+            return response(implode("\n", $lines), 200, ['Content-Type' => 'text/plain; charset=utf-8']);
+        })->name('visitor.robots-txt');
 
         $this->warnIfQueueIsSynchronous();
     }

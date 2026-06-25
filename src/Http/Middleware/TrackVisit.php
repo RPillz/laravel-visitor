@@ -42,6 +42,10 @@ class TrackVisit
             }
         }
 
+        if ($this->hasExceededFingerprintRateLimit($request)) {
+            return $this->blockResponse($request, 429);
+        }
+
         return $next($request);
     }
 
@@ -55,6 +59,7 @@ class TrackVisit
 
         if (! $isVerified) {
             $this->maybeBlockFor404s($request, $response);
+            $this->trackFingerprintRate($request, $response);
         }
     }
 
@@ -112,6 +117,47 @@ class TrackVisit
         $key = 'visitor_404_'.LaravelVisitor::resolveConnection().'_'.$request->ip();
 
         return RateLimiter::tooManyAttempts($key, $threshold);
+    }
+
+    protected function hasExceededFingerprintRateLimit(Request $request): bool
+    {
+        if (! config('visitor.rate_limit.enabled', false)) {
+            return false;
+        }
+
+        $threshold = (int) config('visitor.rate_limit.threshold', 60);
+        $key = 'visitor_rl_'.LaravelVisitor::resolveConnection().'_'.$this->headerFingerprint->compute($request);
+
+        return RateLimiter::tooManyAttempts($key, $threshold);
+    }
+
+    protected function trackFingerprintRate(Request $request, Response $response): void
+    {
+        if (! config('visitor.rate_limit.enabled', false)) {
+            return;
+        }
+
+        // Do not count responses that are themselves rate-limit rejections.
+        if ($response->getStatusCode() === 429) {
+            return;
+        }
+
+        $fingerprint = $this->headerFingerprint->compute($request);
+        $threshold = (int) config('visitor.rate_limit.threshold', 60);
+        $window = (int) config('visitor.rate_limit.window', 1);
+        $key = 'visitor_rl_'.LaravelVisitor::resolveConnection().'_'.$fingerprint;
+
+        RateLimiter::hit($key, $window * 60);
+
+        if (config('visitor.rate_limit.auto_block', true) && RateLimiter::tooManyAttempts($key, $threshold)) {
+            $duration = config('visitor.probe_block_duration');
+            $expiresAt = $duration ? now()->addMinutes((int) $duration) : null;
+
+            VisitorIgnore::updateOrCreate(
+                ['type' => 'header_fingerprint', 'value' => $fingerprint],
+                ['is_blocked' => true, 'is_automatic' => true, 'expires_at' => $expiresAt],
+            );
+        }
     }
 
     protected function trackBlocked(Request $request): void
@@ -238,6 +284,22 @@ class TrackVisit
         $fingerprint = $this->headerFingerprint->compute($request);
         foreach ($list['header_fingerprint'] ?? [] as $entry) {
             if ($entry['is_blocked'] && $entry['value'] === $fingerprint && $this->isActive($entry)) {
+                return true;
+            }
+        }
+
+        // Bot name and unverified bot checks — only run when the relevant config is active.
+        $blockNames = config('visitor.block_verified_bots', []);
+        $blockUnverified = config('visitor.block_unverified_bots', false);
+
+        if (($blockNames || $blockUnverified) && $request->userAgent()) {
+            $botName = $this->agentResolver->botName($request->userAgent());
+
+            if ($botName && in_array($botName, $blockNames, true)) {
+                return true;
+            }
+
+            if ($botName && $blockUnverified && ! $this->verifiedCrawlerResolver->isVerified($request)) {
                 return true;
             }
         }

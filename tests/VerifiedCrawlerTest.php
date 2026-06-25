@@ -15,7 +15,6 @@ beforeEach(function () {
         'visitor.probe_block_duration' => null,
         'visitor.store_ip' => true,
         'visitor.verified_crawlers.enabled' => true,
-        'visitor.verified_crawlers.domains' => ['googlebot.com'],
         'visitor.verified_crawlers.cache_ttl' => 1440,
     ]);
     Cache::flush();
