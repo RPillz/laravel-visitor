@@ -179,7 +179,7 @@ return [
     */
     'block_probes' => env('VISITOR_BLOCK_PROBES', true),
 
-    'log_blocks' => env('VISITOR_LOG_BLOCKS', false),
+    'log_blocks' => env('VISITOR_LOG_BLOCKS', true),
 
     'probe_paths' => [
          'wp-admin*',
@@ -189,11 +189,11 @@ return [
          'xmlrpc.php',
     ],
 
-    'probe_block_duration' => env('VISITOR_PROBE_BLOCK_DURATION', null), // minutes, null = permanent
+    'probe_block_duration' => env('VISITOR_PROBE_BLOCK_DURATION', 60*24*3), // minutes, null = permanent
 
     'probe_404' => [
         'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 10), // 404s within the window before blocking
-        'window' => env('VISITOR_PROBE_404_WINDOW', 5),        // minutes
+        'window' => env('VISITOR_PROBE_404_WINDOW', 3),        // minutes
     ],
 
     /*
@@ -221,6 +221,12 @@ return [
             'yandex.net',
             'yandex.ru',
             'crawl.baidu.com',
+            'bot.amazon.com',
+            'openai.com',
+            'anthropic.com',
+            'petalsearch.com',
+            'qwant.com',
+            'facebook.com',
         ],
     ],
 
@@ -233,7 +239,7 @@ return [
     */
     'pruning' => [
         'enabled' => true,
-        'days' => env('VISITOR_PRUNE_DAYS', 365),
+        'days' => env('VISITOR_PRUNE_DAYS', 90),
     ],
 
 ];

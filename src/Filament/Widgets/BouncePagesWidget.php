@@ -14,8 +14,6 @@ class BouncePagesWidget extends TableWidget
 {
     protected static ?string $heading = 'Bounce Pages';
 
-    protected int|string|array $columnSpan = 'full';
-
     public function getTableRecordKey(Model|array $record): string
     {
         return is_array($record) ? $record['path'] : $record->path;
@@ -39,7 +37,6 @@ class BouncePagesWidget extends TableWidget
                     })
                     ->groupBy('path')
                     ->orderByDesc('bounce_count')
-                    ->limit(20)
             )
             ->columns([
                 TextColumn::make('path')
@@ -63,6 +60,6 @@ class BouncePagesWidget extends TableWidget
                         : $query
                     ),
             ])
-            ->paginated(false);
+            ->paginated([10, 25, 50]);
     }
 }

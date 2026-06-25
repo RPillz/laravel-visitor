@@ -20,8 +20,6 @@ class TopBotsWidget extends TableWidget
         return (bool) config('visitor.track_bots', true);
     }
 
-    protected int|string|array $columnSpan = 'full';
-
     public function getTableRecordKey(Model|array $record): string
     {
         return is_array($record) ? ($record['bot_name'] ?? '') : ($record->bot_name ?? '');
@@ -36,7 +34,6 @@ class TopBotsWidget extends TableWidget
                     ->whereNotNull('bot_name')
                     ->groupBy('bot_name')
                     ->orderByDesc('visit_count')
-                    ->limit(20)
             )
             ->columns([
                 TextColumn::make('bot_name')
@@ -66,6 +63,6 @@ class TopBotsWidget extends TableWidget
                         : $query
                     ),
             ])
-            ->paginated(false);
+            ->paginated([10, 25, 50]);
     }
 }

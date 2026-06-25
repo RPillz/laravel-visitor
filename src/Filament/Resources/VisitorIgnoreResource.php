@@ -26,7 +26,7 @@ class VisitorIgnoreResource extends Resource
 
     protected static ?string $navigationLabel = 'Ignore / Block List';
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Analytics';
+    protected static \UnitEnum|string|null $navigationGroup = 'Visitors';
 
     protected static ?int $navigationSort = 100;
 

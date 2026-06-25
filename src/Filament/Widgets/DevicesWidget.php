@@ -14,8 +14,6 @@ class DevicesWidget extends TableWidget
 {
     protected static ?string $heading = 'Devices & Browsers';
 
-    protected int|string|array $columnSpan = 'full';
-
     public function getTableRecordKey(Model|array $record): string
     {
         if (is_array($record)) {
@@ -35,7 +33,6 @@ class DevicesWidget extends TableWidget
                     ->whereNull('bot_name')
                     ->groupBy('device_type', 'browser', 'os')
                     ->orderByDesc('visit_count')
-                    ->limit(20)
             )
             ->columns([
                 TextColumn::make('device_type')
@@ -68,6 +65,6 @@ class DevicesWidget extends TableWidget
                         : $query
                     ),
             ])
-            ->paginated(false);
+            ->paginated([10, 25, 50]);
     }
 }

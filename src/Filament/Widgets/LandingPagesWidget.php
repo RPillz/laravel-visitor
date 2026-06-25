@@ -14,8 +14,6 @@ class LandingPagesWidget extends TableWidget
 {
     protected static ?string $heading = 'Landing Pages';
 
-    protected int|string|array $columnSpan = 'full';
-
     public function getTableRecordKey(Model|array $record): string
     {
         return is_array($record) ? $record['path'] : $record->path;
@@ -38,7 +36,6 @@ class LandingPagesWidget extends TableWidget
                     })
                     ->groupBy('path')
                     ->orderByDesc('entry_count')
-                    ->limit(20)
             )
             ->columns([
                 TextColumn::make('path')
@@ -62,6 +59,6 @@ class LandingPagesWidget extends TableWidget
                         : $query
                     ),
             ])
-            ->paginated(false);
+            ->paginated([10, 25, 50]);
     }
 }

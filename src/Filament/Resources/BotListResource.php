@@ -22,7 +22,7 @@ class BotListResource extends Resource
 
     protected static ?string $navigationLabel = 'Bot List';
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Analytics';
+    protected static \UnitEnum|string|null $navigationGroup = 'Visitors';
 
     protected static ?int $navigationSort = 50;
 

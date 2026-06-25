@@ -283,6 +283,28 @@ Legitimate search engine bots verify themselves via reverse DNS. When `verified_
 
 DNS results are cached per IP for `cache_ttl` minutes so verification only runs once per unique crawler address.
 
+### Discouraging scraper bots with robots.txt
+
+Commercial SEO crawlers (Semrush, Ahrefs, Majestic, Moz, etc.) and aggressive scrapers provide no SEO or indexing benefit to your site — they exist to gather data for their own platforms. A `robots.txt` `Disallow` rule won't stop a bot that ignores it, but most of the named commercial crawlers do respect it.
+
+```
+# /public/robots.txt
+
+User-agent: SemrushBot
+User-agent: AhrefsBot
+User-agent: MJ12bot
+User-agent: DotBot
+User-agent: BLEXBot
+User-agent: DataForSeoBot
+User-agent: MauiBot
+User-agent: Bytespider
+User-agent: TikTokSpider
+User-agent: PetalBot
+Disallow: /
+```
+
+Bots that ignore `robots.txt` are exactly the kind of traffic this package's probe-path blocking and 404 rate-limiting are designed to catch.
+
 ### Block logging
 
 To record blocked requests for auditing, enable block logging:

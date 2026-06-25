@@ -14,8 +14,6 @@ class TopPagesWidget extends TableWidget
 {
     protected static ?string $heading = 'Top Pages';
 
-    protected int|string|array $columnSpan = 'full';
-
     public function getTableRecordKey(Model|array $record): string
     {
         return is_array($record) ? $record['path'] : $record->path;
@@ -30,7 +28,6 @@ class TopPagesWidget extends TableWidget
                     ->whereNull('bot_name')
                     ->groupBy('path')
                     ->orderByDesc('visit_count')
-                    ->limit(20)
             )
             ->columns([
                 TextColumn::make('path')
@@ -54,6 +51,6 @@ class TopPagesWidget extends TableWidget
                         : $query
                     ),
             ])
-            ->paginated(false);
+            ->paginated([10, 25, 50]);
     }
 }
