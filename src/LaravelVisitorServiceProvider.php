@@ -2,8 +2,10 @@
 
 namespace RPillz\LaravelVisitor;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use RPillz\LaravelVisitor\Commands\ForgetVisitorCommand;
 use RPillz\LaravelVisitor\Commands\InstallVisitorCommand;
 use RPillz\LaravelVisitor\Commands\PruneVisitsCommand;
@@ -143,9 +145,37 @@ class LaravelVisitorServiceProvider extends PackageServiceProvider
                 $migration->up();
             }
 
+            $this->markVisitorMigrationsAsRun();
+
             Log::info("laravel-visitor: Created SQLite database at {$path}.");
         } catch (\Throwable $e) {
             Log::error("laravel-visitor: Failed to auto-create SQLite database at {$path}: {$e->getMessage()}");
+        }
+    }
+
+    protected function markVisitorMigrationsAsRun(): void
+    {
+        try {
+            if (! Schema::hasTable('migrations')) {
+                return;
+            }
+
+            $batch = (DB::table('migrations')->max('batch') ?? 0) + 1;
+
+            foreach (['create_visits_table', 'create_visitor_ignores_table'] as $name) {
+                foreach (glob(database_path("migrations/*_{$name}.php")) as $file) {
+                    $key = pathinfo($file, PATHINFO_FILENAME);
+
+                    if (! DB::table('migrations')->where('migration', $key)->exists()) {
+                        DB::table('migrations')->insert([
+                            'migration' => $key,
+                            'batch' => $batch,
+                        ]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning("laravel-visitor: Could not record visitor migrations as run: {$e->getMessage()}");
         }
     }
 

@@ -13,6 +13,10 @@ return new class extends Migration
 
     public function up(): void
     {
+        if (Schema::connection($this->getConnection())->hasTable('visitor_ignores')) {
+            return;
+        }
+
         Schema::connection($this->getConnection())->create('visitor_ignores', function (Blueprint $table) {
             $table->id();
             $table->string('type', 20)->index();
