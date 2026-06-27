@@ -82,6 +82,8 @@ class LaravelVisitorServiceProvider extends PackageServiceProvider
 
         parent::boot();
 
+        $this->ensureSqliteDatabaseExists();
+
         $this->app['router']->aliasMiddleware('visitor.track', TrackVisit::class);
 
         if (config('visitor.auto_track', true)) {
@@ -104,6 +106,47 @@ class LaravelVisitorServiceProvider extends PackageServiceProvider
         })->name('visitor.robots-txt');
 
         $this->warnIfQueueIsSynchronous();
+    }
+
+    protected function ensureSqliteDatabaseExists(): void
+    {
+        if (app()->runningUnitTests()) {
+            return;
+        }
+
+        $connectionName = LaravelVisitor::resolveConnection();
+        $connection = config("database.connections.{$connectionName}");
+
+        if (($connection['driver'] ?? null) !== 'sqlite') {
+            return;
+        }
+
+        $path = $connection['database'] ?? null;
+
+        if (! $path || $path === ':memory:' || file_exists($path)) {
+            return;
+        }
+
+        try {
+            $directory = dirname($path);
+            if (! is_dir($directory)) {
+                mkdir($directory, 0755, true);
+            }
+
+            touch($path);
+
+            $stubs = glob(__DIR__.'/../database/migrations/*.php.stub');
+            sort($stubs);
+
+            foreach ($stubs as $stub) {
+                $migration = require $stub;
+                $migration->up();
+            }
+
+            Log::info("laravel-visitor: Created SQLite database at {$path}.");
+        } catch (\Throwable $e) {
+            Log::error("laravel-visitor: Failed to auto-create SQLite database at {$path}: {$e->getMessage()}");
+        }
     }
 
     protected function warnIfQueueIsSynchronous(): void
