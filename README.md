@@ -6,8 +6,7 @@
 
 Minimalist page-visit analytics for Laravel. Records visits to an isolated SQLite database, resolves country and device info in the background, and surfaces reports through a Filament admin panel plugin — with zero impact on page load times.
 
-Since we're checking all the visits anyway we can also track, and potentially block, bots and crawlers to your site.
-
+Fun fact; this started as a quick way to count visitors. I was blown away to discover tens-of-thousands of bots and crawlers visiting my site *every day*! This quickly package evolved to be more about blocking unwanted bots... while still keeping tabs on the real(?) visitors.
 ## Features
 
 - All tracking runs on a **queued job** — never blocks a request
@@ -431,6 +430,14 @@ This adds an **Analytics** page to your panel at `/your-panel/analytics` with th
 The **Bot List** block action uses the header fingerprint when one is recorded, falling back to a wildcard user-agent rule (`*BotName*`) when not.
 
 ## Configuration
+
+> **Horizon users:** `TrackVisitJob` is a high-frequency, low-importance job that will flood your Horizon dashboard. Add it to the `silenced` array in `config/horizon.php`:
+>
+> ```php
+> 'silenced' => [
+>     \RPillz\LaravelVisitor\Jobs\TrackVisitJob::class,
+> ],
+> ```
 
 ```php
 // config/visitor.php

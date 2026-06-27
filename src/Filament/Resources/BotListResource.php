@@ -22,6 +22,10 @@ class BotListResource extends Resource
 
     protected static ?string $navigationLabel = 'Bot List';
 
+    protected static ?string $modelLabel = 'Bot Visitor';
+
+    protected static ?string $pluralModelLabel = 'Bot Visitors';
+
     protected static \UnitEnum|string|null $navigationGroup = 'Visitors';
 
     protected static ?int $navigationSort = 50;
@@ -45,17 +49,16 @@ class BotListResource extends Resource
                 Visit::withoutGlobalScope('exclude_blocked')
                     ->selectRaw('*, (SELECT COUNT(*) FROM visits v2 WHERE v2.bot_name = visits.bot_name AND (v2.header_fingerprint = visits.header_fingerprint OR (v2.header_fingerprint IS NULL AND visits.header_fingerprint IS NULL))) as visit_count')
                     ->whereIn('id', $latestPerBot)
-                    ->orderByDesc('visit_count')
             )
+            ->defaultSort('visit_count', 'desc')
             ->columns([
                 TextColumn::make('bot_name')
                     ->label('Bot')
                     ->searchable(),
-                TextColumn::make('header_fingerprint')
-                    ->label('Fingerprint')
-                    ->limit(12)
-                    ->copyable()
-                    ->placeholder('—'),
+                TextColumn::make('created_at')
+                    ->label('Last Seen')
+                    ->since()
+                    ->sortable(),
                 TextColumn::make('visit_count')
                     ->label('Visits')
                     ->sortable(),
@@ -82,6 +85,27 @@ class BotListResource extends Resource
                     ),
             ])
             ->actions([
+                Action::make('history')
+                    ->label('History')
+                    ->icon('heroicon-o-clock')
+                    ->color('gray')
+                    ->modalHeading(fn (Visit $record) => 'Visit History: '.$record->bot_name)
+                    ->modalContent(fn (Visit $record) => view('laravel-visitor::filament.bot-visit-history', [
+                        'visits' => Visit::withoutGlobalScope('exclude_blocked')
+                            ->where('bot_name', $record->bot_name)
+                            ->where(function ($q) use ($record) {
+                                if (filled($record->header_fingerprint)) {
+                                    $q->where('header_fingerprint', $record->header_fingerprint);
+                                } else {
+                                    $q->whereNull('header_fingerprint');
+                                }
+                            })
+                            ->orderByDesc('created_at')
+                            ->limit(25)
+                            ->get(),
+                    ]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close'),
                 Action::make('block')
                     ->label('Block')
                     ->icon('heroicon-o-shield-exclamation')

@@ -18,6 +18,7 @@ class LaravelVisitorServiceProvider extends PackageServiceProvider
         $package
             ->name('laravel-visitor')
             ->hasConfigFile()
+            ->hasViews()
             ->hasMigration('create_visits_table')
             ->hasMigration('create_visitor_ignores_table')
             ->hasCommands([
@@ -77,6 +78,8 @@ class LaravelVisitorServiceProvider extends PackageServiceProvider
 
     public function boot(): void
     {
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'laravel-visitor');
+
         parent::boot();
 
         $this->app['router']->aliasMiddleware('visitor.track', TrackVisit::class);
