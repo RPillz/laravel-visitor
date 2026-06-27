@@ -177,3 +177,65 @@ it('returns 403 when a request user agent is blocked', function () {
 
     expect($response->getStatusCode())->toBe(403);
 });
+
+// --- Expiry in isIgnored() (terminate path) ---
+
+it('does not suppress tracking when an IP ignore entry has expired', function () {
+    VisitorIgnore::create([
+        'type' => 'ip',
+        'value' => '1.2.3.4',
+        'is_blocked' => false,
+        'is_automatic' => true,
+        'expires_at' => now()->subMinute(),
+    ]);
+    // Manually put the expired entry into the cache as a timestamp so isActive() is exercised
+    // against a cached (non-fresh) value — the exact path that crashed in production.
+    $key = 'visitor.ignore_list.'.LaravelVisitor::resolveConnection();
+    Cache::put($key, [
+        'ip' => [['value' => '1.2.3.4', 'is_blocked' => false, 'expires_at' => time() - 60]],
+    ], now()->addMinutes(5));
+
+    $request = Request::create('https://example.com/about', 'GET', [], [], [], ['REMOTE_ADDR' => '1.2.3.4']);
+    app(TrackVisit::class)->terminate($request, makeOkResponse());
+
+    Queue::assertPushed(TrackVisitJob::class);
+});
+
+it('suppresses tracking when an IP ignore entry has not yet expired', function () {
+    VisitorIgnore::create([
+        'type' => 'ip',
+        'value' => '1.2.3.4',
+        'is_blocked' => false,
+        'is_automatic' => true,
+        'expires_at' => now()->addHour(),
+    ]);
+    $key = 'visitor.ignore_list.'.LaravelVisitor::resolveConnection();
+    Cache::put($key, [
+        'ip' => [['value' => '1.2.3.4', 'is_blocked' => false, 'expires_at' => time() + 3600]],
+    ], now()->addMinutes(5));
+
+    $request = Request::create('https://example.com/about', 'GET', [], [], [], ['REMOTE_ADDR' => '1.2.3.4']);
+    app(TrackVisit::class)->terminate($request, makeOkResponse());
+
+    Queue::assertNotPushed(TrackVisitJob::class);
+});
+
+it('does not crash when the cached ignore list contains a future expires_at alongside other entries', function () {
+    // Regression: getIgnoreList() previously stored Carbon objects in cache. When deserialized,
+    // Carbon became an incomplete object and isActive() threw on ->isFuture(), silently
+    // aborting terminate() before track() dispatched the job.
+    $key = 'visitor.ignore_list.'.LaravelVisitor::resolveConnection();
+    Cache::put($key, [
+        'ip' => [
+            ['value' => '5.5.5.5', 'is_blocked' => false, 'expires_at' => time() + 3600],
+        ],
+        'user_id' => [
+            ['value' => '3', 'is_blocked' => false, 'expires_at' => null],
+        ],
+    ], now()->addMinutes(5));
+
+    $request = Request::create('https://example.com/about', 'GET', [], [], [], ['REMOTE_ADDR' => '1.2.3.4']);
+    app(TrackVisit::class)->terminate($request, makeOkResponse());
+
+    Queue::assertPushed(TrackVisitJob::class);
+});

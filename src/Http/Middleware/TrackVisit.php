@@ -343,7 +343,7 @@ class TrackVisit
 
     protected function isActive(array $entry): bool
     {
-        return ! $entry['expires_at'] || $entry['expires_at']->isFuture();
+        return ! $entry['expires_at'] || $entry['expires_at'] > time();
     }
 
     protected function getIgnoreList(): array
@@ -356,7 +356,7 @@ class TrackVisit
                 ->map(fn ($items) => $items->map(fn ($item) => [
                     'value' => $item->value,
                     'is_blocked' => (bool) $item->is_blocked,
-                    'expires_at' => $item->expires_at,
+                    'expires_at' => $item->expires_at?->getTimestamp(),
                 ])->values()->all())
                 ->all();
         });
