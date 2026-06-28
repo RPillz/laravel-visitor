@@ -348,7 +348,7 @@ class TrackVisit
 
     protected function getIgnoreList(): array
     {
-        return Cache::remember('visitor.ignore_list.'.LaravelVisitor::resolveConnection(), now()->addMinutes(5), function () {
+        return Cache::remember('visitor.ignore_list.v2.'.LaravelVisitor::resolveConnection(), now()->addMinutes(5), function () {
             return VisitorIgnore::where(function ($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })->get()
