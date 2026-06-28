@@ -29,31 +29,11 @@ class TrackVisitJob implements ShouldQueue
         public readonly ?string $sessionId,
         public readonly bool $isUser,
         public readonly ?int $userId,
-        public bool $isBlocked = false,
-        public bool $isVerified = false,
-        public ?string $headerFingerprint = null,
-        public bool $looksLikeBrowser = true,
+        public readonly bool $isBlocked = false,
+        public readonly bool $isVerified = false,
+        public readonly ?string $headerFingerprint = null,
+        public readonly bool $looksLikeBrowser = true,
     ) {}
-
-    public function __wakeup(): void
-    {
-        // Old serialized jobs may be missing properties added after initial dispatch.
-        // ReflectionProperty::isInitialized() is the only reliable way to detect this
-        // without triggering the "must not be accessed before initialization" error.
-        $defaults = [
-            'isBlocked' => false,
-            'isVerified' => false,
-            'headerFingerprint' => null,
-            'looksLikeBrowser' => true,
-        ];
-
-        $rf = new \ReflectionObject($this);
-        foreach ($defaults as $name => $default) {
-            if (! $rf->getProperty($name)->isInitialized($this)) {
-                $this->$name = $default;
-            }
-        }
-    }
 
     public function handle(GeoResolver $geoResolver, AgentResolver $agentResolver): void
     {
