@@ -313,6 +313,33 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Allow Paths
+    |--------------------------------------------------------------------------
+    | Requests whose path matches any pattern here bypass automatic probe-path
+    | detection, the 404 rate limiter, and the fingerprint rate limiter — the
+    | same three mechanisms that verified crawlers bypass. Supports wildcards
+    | (* and ?).
+    |
+    | Do NOT include a leading slash — patterns match against $request->path(),
+    | which Laravel returns without one (same convention as exclude_paths and
+    | probe_paths above). 'feed.xml' matches; '/feed.xml' never will.
+    |
+    | This does NOT bypass persistent manual blocks (isBlocked(): ignore-list
+    | entries, or block_verified_bots/block_unverified_bots) — a visitor
+    | already blocked by IP, fingerprint, user agent, or bot name stays
+    | blocked even on an allowed path.
+    |
+    | Keep patterns narrow — anything matched here loses automatic scanner/
+    | rate-limit protection for every request to that path. Useful for public
+    | feeds or webhooks that legitimate bots hit frequently and that would
+    | otherwise look like probing or high-volume scraping.
+    */
+    'allow_paths' => [
+        // 'feed.xml',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Verified Crawlers
     |--------------------------------------------------------------------------
     | When enabled, known crawlers are verified via two methods:

@@ -286,6 +286,18 @@ Verified bots bypass probe-path and 404-rate blocking and fingerprint rate limit
 
 Verification results are cached per IP for `cache_ttl` minutes. IP list responses are cached for 24 hours.
 
+### Allowing specific paths
+
+Some public resources — an RSS/podcast feed, a webhook endpoint — get hit by bots often enough, and predictably enough, to look like probing or high-volume scraping. Add a pattern to `allow_paths` to exempt a path from that automatic layer:
+
+```php
+'allow_paths' => [
+    'feed.xml', // podcast feed — polled constantly by directories and apps
+],
+```
+
+Patterns support `*`/`?` wildcards and, like `probe_paths` and `exclude_paths`, are matched without a leading slash. An allowed path bypasses probe-path detection, the 404 rate limiter, and the fingerprint rate limiter — the same three mechanisms verified crawlers bypass. It does **not** bypass persistent manual blocks: a visitor already blocked by IP, fingerprint, user agent, or bot name in the ignore list is still blocked, even on an allowed path.
+
 ### Bot name blocking
 
 Even verified crawlers can be blocked by name. `block_verified_bots` lists bot names (resolved from the User-Agent) that are rejected regardless of verification status. `block_unverified_bots` rejects any crawler that identifies itself by name but cannot be verified:
@@ -538,6 +550,11 @@ return [
     'probe_404' => [
         'threshold' => env('VISITOR_PROBE_404_THRESHOLD', 5),
         'window'    => env('VISITOR_PROBE_404_WINDOW', 3), // minutes
+    ],
+
+    // Paths that bypass probe/404-rate/fingerprint-rate blocking (supports wildcards)
+    'allow_paths' => [
+        // 'feed.xml',
     ],
 
     // Verify legitimate search engine bots via rDNS and published IP lists

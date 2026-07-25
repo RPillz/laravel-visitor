@@ -30,7 +30,9 @@ class TrackVisit
             return $this->blockResponse($request);
         }
 
-        if (config('visitor.block_probes', true)) {
+        $isAllowedPath = $this->isAllowedPath($request);
+
+        if (! $isAllowedPath && config('visitor.block_probes', true)) {
             if ($this->isProbe($request) && ! $this->verifiedCrawlerResolver->isVerified($request)) {
                 $this->autoBlock($request);
 
@@ -42,7 +44,7 @@ class TrackVisit
             }
         }
 
-        if ($this->hasExceededFingerprintRateLimit($request)) {
+        if (! $isAllowedPath && $this->hasExceededFingerprintRateLimit($request)) {
             return $this->blockResponse($request, 429);
         }
 
@@ -52,12 +54,13 @@ class TrackVisit
     public function terminate(Request $request, Response $response): void
     {
         $isVerified = $this->verifiedCrawlerResolver->isVerified($request);
+        $skipAutoBlocking = $isVerified || $this->isAllowedPath($request);
 
         if ($this->shouldTrack($request, $response)) {
             ($isVerified ? $this->visitor->verified() : $this->visitor)->track($request);
         }
 
-        if (! $isVerified) {
+        if (! $skipAutoBlocking) {
             $this->maybeBlockFor404s($request, $response);
             $this->trackFingerprintRate($request, $response);
         }
@@ -189,6 +192,23 @@ class TrackVisit
     protected function isProbe(Request $request): bool
     {
         $paths = config('visitor.probe_paths', []);
+
+        if (empty($paths)) {
+            return false;
+        }
+
+        foreach ($paths as $pattern) {
+            if (Str::is($pattern, $request->path())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function isAllowedPath(Request $request): bool
+    {
+        $paths = config('visitor.allow_paths', []);
 
         if (empty($paths)) {
             return false;
