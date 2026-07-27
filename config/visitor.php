@@ -86,6 +86,7 @@ return [
         'telescope*',
         'livewire*',
         '_ignition*',
+        'verify*', // used by ALTCHA
     ],
 
     /*
