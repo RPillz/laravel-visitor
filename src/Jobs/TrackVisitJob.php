@@ -7,6 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 use RPillz\LaravelVisitor\Models\Visit;
 use RPillz\LaravelVisitor\Support\AgentResolver;
 use RPillz\LaravelVisitor\Support\GeoResolver;
@@ -17,6 +18,23 @@ class TrackVisitJob implements ShouldQueue
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
+
+    private const COLUMN_LENGTHS = [
+        'url' => 255,
+        'path' => 255,
+        'query' => 255,
+        'referrer' => 255,
+        'referrer_domain' => 255,
+        'ip_address' => 45,
+        'country' => 2,
+        'city' => 255,
+        'device_type' => 20,
+        'browser' => 60,
+        'os' => 60,
+        'header_fingerprint' => 64,
+        'bot_name' => 100,
+        'session_id' => 100,
+    ];
 
     public function __construct(
         public readonly string $dbConnection,
@@ -55,7 +73,7 @@ class TrackVisitJob implements ShouldQueue
             $referrerDomain = $parsed['host'] ?? null;
         }
 
-        Visit::on($this->dbConnection)->create([
+        $attributes = [
             'url' => $this->url,
             'path' => $this->path,
             'query' => $this->query,
@@ -75,6 +93,14 @@ class TrackVisitJob implements ShouldQueue
             'is_user' => $this->isUser,
             'user_id' => $this->userId,
             'session_id' => $this->sessionId,
-        ]);
+        ];
+
+        foreach (self::COLUMN_LENGTHS as $column => $length) {
+            if (is_string($attributes[$column])) {
+                $attributes[$column] = Str::substr($attributes[$column], 0, $length);
+            }
+        }
+
+        Visit::on($this->dbConnection)->create($attributes);
     }
 }
